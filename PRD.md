@@ -1,18 +1,15 @@
-# Perfect ASIN - Product Requirements Document v2.0
+# CC Team Dashboard - Product Requirements Document
 
-**AI-Powered Amazon Listing Carousel Optimization Tool**
-
-> "Generate conversion-optimized product image carousels in minutes, not days."
+**Internal Team Dashboard for Claude Code Agent Monitoring & GitHub Issue Tracking**
 
 | Field | Value |
 |-------|-------|
-| Document Version | 2.0 |
-| Date | January 3, 2026 |
+| Document Version | 1.0 |
+| Date | February 6, 2026 |
 | Status | Ready for Development |
-| Product Name | Perfect ASIN |
-| Domain | PerfectASIN.com |
-| Tech Stack | Google Cloud Platform (Vertex AI, Gemini 2.5, Imagen 4) |
-| Primary Goal | Increase Amazon Listing Conversion Rates |
+| Product Name | CC Team Dashboard |
+| Tech Stack | Python Flask, SQLite, Jinja2, HTML/CSS/JS |
+| Theme | Dark Theme |
 
 ---
 
@@ -20,477 +17,255 @@
 
 ### 1.1 Product Overview
 
-Perfect ASIN is an AI-powered SaaS platform that generates complete, conversion-optimized Amazon product image carousels (7-9 images) from minimal user input. The system analyzes existing Amazon listings, extracts product data automatically, studies top-performing competitors, and generates professional carousel images designed to maximize buyer conversion rates.
+CC Team Dashboard is an internal web application built with Flask that provides a centralized view of Claude Code agent activity and GitHub issue tracking. The dashboard features a dark theme UI and serves as the primary monitoring interface for the CC development team to track agent status, review GitHub issues, and monitor project health at a glance.
 
 ### 1.2 Core Value Proposition
 
-- **15-minute carousel generation** vs. 1-3 weeks with traditional methods
-- **Zero design skills required** - AI handles all creative decisions
-- **Automatic competitor analysis** and best-practice extraction
-- **100% Amazon-compliant output** (dimensions, format, content guidelines)
-- **Zero spelling/grammar errors** through multi-layer text validation
-- **ICP-optimized copy** written in proper American English
-
-### 1.3 Key Differentiators
-
-| Feature | Competitors | Perfect ASIN |
-|---------|-------------|--------------|
-| ASIN Auto-Extraction | Manual input only | Auto-scrape from URL/ASIN |
-| Competitor Analysis | None or basic | Top 10 SERP analysis |
-| Text Validation | Basic spell-check | Multi-layer AI + dictionary |
-| Image Themes | Generic templates | 7 conversion-optimized themes |
-| ICP Optimization | User-defined only | AI-suggested + user override |
-| Output Quality | Varies | 2000x2000px PNG guaranteed |
+- **Real-time agent monitoring** — view the status of all Claude Code agents in one place
+- **GitHub issue integration** — pull and display issues from GitHub repositories without leaving the dashboard
+- **Dark theme UI** — optimized for extended use and reduced eye strain
+- **Lightweight deployment** — Flask-based with minimal infrastructure requirements
+- **Team-oriented** — built for internal use with a focus on developer productivity
 
 ---
 
-## 2. Product Vision & Goals
+## 2. Goals & Objectives
 
-### 2.1 Mission Statement
+### 2.1 Primary Goals
 
-Empower Amazon sellers of all sizes to create professional, high-converting product image carousels without design expertise, expensive agencies, or lengthy turnaround times. Our north star metric is **increasing listing conversion rates** for every user.
+1. Provide a single-pane-of-glass view for CC agent operational status
+2. Surface GitHub issues with filtering, sorting, and label-based categorization
+3. Deliver a fast, responsive dark-themed interface
+4. Keep the stack simple — Flask, SQLite, server-rendered templates
+5. Enable the team to quickly identify blocked agents, stale issues, and project bottlenecks
 
-### 2.2 Primary Business Goals
+### 2.2 Target Users
 
-1. Reduce carousel creation time from weeks to under 15 minutes
-2. Achieve measurable conversion rate improvements for users (target: 15-30% lift)
-3. Maintain zero-tolerance policy on spelling/grammar errors
-4. Scale to 10,000+ monthly active users within Year 1
-5. Achieve 99% Amazon compliance rate on generated images
-
-### 2.3 Target Users
-
-| User Segment | Characteristics | Primary Needs |
-|--------------|-----------------|---------------|
-| Solo Sellers | 1-10 products, limited budget | Speed, affordability, no design skills required |
-| Growing Brands | 10-100 products, small team | Consistency, bulk generation, brand guidelines |
-| Agencies | Manage multiple client accounts | White-label options, client management, API access |
-| Enterprise Sellers | 100+ products, established | Integration, compliance, audit trails |
+| User | Role | Primary Need |
+|------|------|--------------|
+| CC Engineers | Core development team | Monitor agent health, triage issues |
+| Team Leads | Project oversight | Track milestone progress, identify blockers |
+| On-Call Engineers | Incident response | Quickly assess agent status and recent failures |
 
 ---
 
-## 3. User Input Specifications
+## 3. Feature Specifications
 
-### 3.1 Product Identification (Required)
+### 3.1 Agent Status Panel
 
-| Field | Type | Functionality |
-|-------|------|---------------|
-| **Amazon ASIN*** | Text (10 chars) OR Full URL | Primary identifier. User can paste full Amazon URL or just ASIN. System extracts and fetches all product data. |
-| **Main Product Photo*** | File Upload (PNG/JPG, max 15MB, min 1000x1000px) | High-res product image. Transparent background PNG preferred. System auto-removes background if needed. |
-| **Additional Photos** | File Upload (up to 5) | Optional angles, packaging shots for carousel variations. |
+The main dashboard view displays all Claude Code agents and their current operational state.
 
-### 3.2 Product Details (Auto-Populated from ASIN)
+| Feature | Description |
+|---------|-------------|
+| Agent List | Table/card view of all registered agents |
+| Status Indicator | Color-coded badges: Online (green), Idle (yellow), Offline (red), Error (orange) |
+| Last Active | Timestamp of most recent agent activity |
+| Current Task | Brief description of what the agent is working on |
+| Uptime | Duration since last restart or deployment |
+| Health Check | Periodic ping status with latency display |
+| Filtering | Filter agents by status, name, or task type |
 
-These fields auto-populate when ASIN is provided but can be manually edited:
+### 3.2 GitHub Issues View
 
-| Field | Type | Source |
-|-------|------|--------|
-| Product Title* | Text (max 200 chars) | Extracted from PDP |
-| Brand Name* | Text (max 100 chars) | Extracted from brand field |
-| Product Category | Dropdown (auto-detected) | Amazon category hierarchy |
-| Key Features/Benefits* | Multi-line (5-10 items) | Extracted from bullet points |
-| Price | Currency + Number | Current listing price |
-| Star Rating | Number (1.0-5.0) | Current average rating |
-| Review Count | Number | Total reviews |
-| Product Description | Text Area (max 2000 chars) | A+ content or description |
+Displays issues pulled from one or more configured GitHub repositories via the GitHub API.
 
-### 3.3 Keywords
+| Feature | Description |
+|---------|-------------|
+| Issue List | Paginated table of open issues with title, labels, assignee, and age |
+| Label Filtering | Filter issues by label (bug, enhancement, priority, etc.) |
+| Repository Selector | Toggle between multiple configured repositories |
+| Issue Detail | Expandable view showing issue body, comments count, and linked PRs |
+| Status Badges | Visual indicators for open, closed, and in-progress states |
+| Sort Options | Sort by created date, updated date, comments, or priority label |
+| Refresh | Manual and auto-refresh (configurable interval) |
 
-| Field | Type | Functionality |
-|-------|------|---------------|
-| **Primary Keyword*** | Text (max 100 chars) | Main search term. Used for SERP competitor analysis (Top 10 organic). |
-| Secondary Keywords | Multi-line (up to 5) | Additional terms for copy generation and feature prioritization. |
+### 3.3 Dashboard Overview
 
-### 3.4 Brand & Style Configuration
+A summary landing page with key metrics and quick-glance widgets.
 
-| Field | Type | Options |
-|-------|------|---------|
-| Brand Identity & Style | Text Area (max 300 chars) | Example: "Modern minimalist, earth tones, targets millennial moms" |
-| Visual Theme Preset | Dropdown | Clean/Minimal, Rustic/Artisan, Bold/Aggressive, Organic/Natural, Premium/Luxury, Fun/Playful, Technical/Professional |
-| Primary Brand Color | Color Picker (HEX) | Main accent color |
-| Secondary Brand Color | Color Picker (HEX) | Supporting color |
-| Brand Logo | File Upload (PNG/SVG) | Optional, for lifestyle images |
+| Widget | Content |
+|--------|---------|
+| Agent Summary | Count of agents by status (e.g., 5 Online, 2 Idle, 1 Error) |
+| Open Issues | Total open issues across all configured repos |
+| Recent Activity | Timeline of recent agent events and issue updates |
+| Milestone Progress | Progress bars for each active milestone |
+| Alerts | Highlighted cards for agents in error state or critical issues |
 
-### 3.5 Target Audience
+### 3.4 Dark Theme UI
 
-| Field | Type | Functionality |
-|-------|------|---------------|
-| Target Audience | Text Area OR "AI Suggest" | Example: "Health-conscious women 25-45". AI suggests 3 ICPs if blank. |
-| Use AI Suggestions | Toggle (On/Off) | AI analyzes product + category + competitors for ICP options. |
-| Competitor ASINs | Text (up to 5) | Optional specific competitors. Defaults to Top 10 organic. |
-
----
-
-## 4. ASIN Data Extraction Engine
-
-### 4.1 Input Methods
-
-1. Direct ASIN entry (e.g., B08XYZ123)
-2. Full Amazon URL (e.g., https://www.amazon.com/dp/B08XYZ123)
-3. Amazon URL with referral parameters (auto-cleaned)
-4. International domains (.co.uk, .de, .ca, etc.)
-
-### 4.2 Data Points Extracted
-
-| Category | Fields | Usage |
-|----------|--------|-------|
-| Basic Info | Title, Brand, ASIN, Category | Pre-populate form, template selection |
-| Pricing | Current price, List price, Deal status | Value messaging, variant displays |
-| Features | Bullet points (5-7) | Auto-populate benefits, infographic content |
-| Description | Product description, A+ content | Feature mining, copy inspiration |
-| Social Proof | Star rating, Review count, BSR | Social proof images, trust badges |
-| Specifications | Dimensions, Weight, Materials | Size comparison images, spec infographics |
-| Images | Existing carousel URLs | Style analysis, gap identification |
-| Variations | Size/Color options, Pricing | Variant comparison images |
-
-### 4.3 Technical Implementation
-
-- **Primary**: Amazon Product Advertising API (PA-API 5.0)
-- **Fallback**: Headless browser scraping (Puppeteer/Playwright)
-- **Rate Limiting**: Request throttling for Amazon ToS compliance
-- **Caching**: 24-hour cache to reduce API calls
-- **Error Handling**: Graceful degradation; allow manual entry
+| Aspect | Specification |
+|--------|---------------|
+| Background | Dark gray (#1a1a2e or similar) |
+| Surface | Slightly lighter panels (#16213e) |
+| Text | Light gray (#e0e0e0) for body, white (#ffffff) for headings |
+| Accent | Blue (#0f3460) for interactive elements, teal (#53d8fb) for highlights |
+| Status Colors | Green (#4ecca3), Yellow (#f0c040), Red (#e74c3c), Orange (#f39c12) |
+| Font | System monospace stack for data, sans-serif for headings |
+| Contrast | WCAG AA compliant minimum contrast ratios |
 
 ---
 
-## 5. Carousel Image Templates (7 Slots)
+## 4. Technical Architecture
 
-### Slot 1: Hero/Main Image
-- **Purpose**: First impression. Must meet Amazon's strict requirements.
-- **Requirements**: Pure white background (#FFFFFF), product fills 85%+, no text/logos
-- **AI Focus**: Clean cutout, professional studio lighting, optional loose product display
+### 4.1 Stack
 
-### Slot 2: Lifestyle/Origin Image
-- **Purpose**: Establish authenticity, origin story, brand credibility
-- **Elements**: Product arranged artistically, trust badges, benefit icons
-- **Text Overlay**: Headline + 3-4 benefit icons with labels
-- **Example**: "AUTHENTIC MEXICAN ANCHO CHILES" with Mexico flag, All Natural, Farm Fresh icons
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Backend | Python Flask | Web framework, routing, API endpoints |
+| Templating | Jinja2 | Server-side HTML rendering |
+| Database | SQLite | Agent registration, configuration, cached data |
+| Frontend | HTML, CSS, JavaScript | Dark theme UI, interactive tables, auto-refresh |
+| GitHub Integration | GitHub REST API (via `requests` or `PyGithub`) | Fetch issues, PRs, repo metadata |
+| Styling | Custom CSS (dark theme) | No heavy framework dependency |
 
-### Slot 3: Feature Infographic (Flavor/Specs)
-- **Purpose**: Communicate key attributes in visual format
-- **Elements**: Product + infographic wheel/chart, visual scales
-- **Text Overlay**: Headline + attribute labels + metrics
-- **Example**: Flavor wheel (Chocolate Notes, Sweet Raisin, Mild Heat, Smoky Finish) + Scoville scale
+### 4.2 Project Structure
 
-### Slot 4: How-To-Use / Instructions
-- **Purpose**: Reduce purchase hesitation with clear usage guidance
-- **Elements**: 3-5 numbered steps, action photos/icons, pro tip callout
-- **Text Overlay**: Headline + step titles + brief instructions
-- **Example**: 4-step process with Pro Tip footer
+```
+cc-team-dashboard/
+├── app.py                  # Flask application entry point
+├── config.py               # Configuration (GitHub tokens, repos, refresh intervals)
+├── requirements.txt        # Python dependencies
+├── models.py               # SQLite models (agents, settings)
+├── github_client.py        # GitHub API integration
+├── templates/
+│   ├── base.html           # Base layout with dark theme, nav
+│   ├── dashboard.html      # Overview / landing page
+│   ├── agents.html         # Agent status panel
+│   └── issues.html         # GitHub issues view
+├── static/
+│   ├── css/
+│   │   └── style.css       # Dark theme styles
+│   └── js/
+│       └── dashboard.js    # Auto-refresh, filtering, interactivity
+├── PRD.md                  # This document
+└── LICENSE
+```
 
-### Slot 5: Size & Scale / Variant Comparison
-- **Purpose**: Set accurate expectations, showcase variants, highlight value
-- **Elements**: Product with ruler, multiple size variants, "Best Value" badge
-- **Text Overlay**: Headline + quantity info + pricing + availability
-- **Example**: Ruler measurement + 3 package sizes with prices
+### 4.3 Key Routes
 
-### Slot 6: Use Cases / Recipe Ideas
-- **Purpose**: Inspire purchase by showing versatility
-- **Elements**: 6 application photos in 2x3 grid, circular frames
-- **Text Overlay**: Headline + application labels + tagline
-- **Example**: Chili, Mole, Enchiladas, Salsa, Tacos, Stews grid
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/` | GET | Dashboard overview with summary widgets |
+| `/agents` | GET | Agent status panel |
+| `/agents/<id>` | GET | Individual agent detail view |
+| `/issues` | GET | GitHub issues list with filters |
+| `/api/agents` | GET | JSON endpoint for agent data |
+| `/api/agents/<id>/status` | POST | Update agent status (webhook/heartbeat) |
+| `/api/issues/refresh` | POST | Trigger GitHub issue re-fetch |
 
-### Slot 7: Social Proof / Quality Guarantee
-- **Purpose**: Build trust, reduce risk, reinforce quality
-- **Elements**: Brand logo, 5 trust badges (numbered), star rating
-- **Text Overlay**: Headline + badge labels + satisfaction promise
-- **Example**: "PREMIUM QUALITY GUARANTEE" with 5 circular badges + 4.7/5 stars
-
----
-
-## 6. AI Image Generation Pipeline
-
-### 6.1 Three-Layer Composition (Critical Architecture)
-
-**Problem**: AI image generators struggle with accurate text rendering.
-
-**Solution**: Separate generation from text overlay:
-
-1. **Layer 1 - Background/Scene**: AI-generated (Imagen 4)
-2. **Layer 2 - Product Image**: User upload (background removed)
-3. **Layer 3 - Text & Graphics**: Programmatic rendering (100% accuracy)
-
-### 6.2 Google Vertex AI Models
-
-| Component | Model | Purpose |
-|-----------|-------|---------|
-| Scene Generation | Imagen 4 (imagen-4.0-generate-001) | Backgrounds, lifestyle scenes |
-| Premium Generation | Imagen 4 Ultra | Hero images, key shots |
-| Copy Generation | Gemini 2.5 Flash | Headlines, ICP-optimized copy |
-| Image Analysis | Gemini 2.5 Flash (Multimodal) | Analyze uploads, suggest compositions |
-| Competitor Analysis | Gemini 2.5 Pro | Deep competitor strategy analysis |
-
-### 6.3 Imagen 4 Configuration
+### 4.4 Configuration
 
 ```python
-config = {
-    "model": "imagen-4.0-generate-001",
-    "image_size": "2K",  # 2048x2048
-    "aspect_ratio": "1:1",
-    "number_of_images": 4,
-    "safety_filter_level": "block_some",
-    "person_generation": "allow_adult",
-    "language": "en"
-}
-```
-
-### 6.4 Composition Pipeline
-
-1. **Background Generation**: Imagen generates scene from slot template
-2. **Product Extraction**: Remove background (rembg or Cloud Vision)
-3. **Shadow Generation**: AI-generate realistic shadow/reflection
-4. **Composite Assembly**: Layer product onto background
-5. **Text Overlay Rendering**: Python Pillow or HTML5 Canvas
-6. **Final Export**: 2000x2000px PNG, optimized file size
-
----
-
-## 7. Quality Control & Text Validation
-
-### 7.1 Multi-Layer Validation Pipeline
-
-| Layer | Method | Purpose |
-|-------|--------|---------|
-| 1 | Gemini Spell Check | AI contextual spelling/grammar |
-| 2 | LanguageTool API | Rule-based grammar, style |
-| 3 | PySpellChecker | Dictionary-based fallback |
-| 4 | Brand Dictionary | Whitelist brand names, jargon |
-| 5 | Human Review Flag | Flag uncertain corrections |
-
-### 7.2 American English Rules
-
-- Default American spelling (color, flavor)
-- American idioms natural to target ICP
-- Support UK, CA, AU as selectable options
-- ICP-appropriate vocabulary level
-
-### 7.3 Copy Generation Prompt
-
-```
-You are an expert Amazon copywriter.
-
-Product: {product_name}
-Category: {category}
-Key Benefits: {benefits}
-Target Audience (ICP): {icp}
-
-Task: Generate {count} headlines (max 4-5 words each).
-
-RULES:
-1. Use proper American English spelling and grammar
-2. Zero spelling errors - double-check every word
-3. Match tone to ICP: {tone}
-4. Use action words and benefit-focused language
-5. Avoid generic phrases like "Best Quality"
-6. Include power words: Premium, Authentic, Fresh, Natural
-7. Create urgency or aspiration where appropriate
-```
-
-### 7.4 Post-Generation Verification
-
-1. **OCR Verification**: Cloud Vision extracts rendered text
-2. **Compare**: Verify OCR matches intended text
-3. **Flag Discrepancies**: Regenerate if mismatch
-4. **Quality Score**: Target 99.9% accuracy
-
----
-
-## 8. Technical Architecture
-
-### 8.1 Google Cloud Platform Stack
-
-| Component | Service | Purpose |
-|-----------|---------|---------|
-| Image Generation | Vertex AI - Imagen 4 | AI image generation |
-| Text/Logic AI | Vertex AI - Gemini 2.5 | Copy, ICP, competitors |
-| Vision/OCR | Cloud Vision API | Text verification |
-| Backend API | Cloud Run | FastAPI, auto-scaling |
-| Frontend | Firebase Hosting | React.js with CDN |
-| Database | Cloud Firestore | Users, projects, history |
-| File Storage | Cloud Storage | Images, assets, exports |
-| Authentication | Firebase Auth | User accounts, OAuth |
-| Job Queue | Cloud Tasks | Async processing |
-| Monitoring | Cloud Monitoring | Metrics, errors |
-| Secrets | Secret Manager | API keys |
-
-### 8.2 Architecture Flow
-
-```
-[Browser] → [Firebase Hosting (React)]
-                ↓
-        [Cloud Run API (FastAPI)]
-                ↓
-    ┌─────────────────────────┐
-    │      Vertex AI          │
-    │  Imagen 4 | Gemini 2.5  │
-    └─────────────────────────┘
-                ↓
-    [Cloud Storage] ↔ [Firestore]
-                ↓
-    [Generated Images] → [User Export]
+# config.py
+GITHUB_TOKEN = "..."                    # Personal access token or GitHub App token
+GITHUB_REPOS = [                        # Repositories to track
+    "org/repo-1",
+    "org/repo-2",
+]
+ISSUE_REFRESH_INTERVAL = 300            # Seconds between auto-refresh
+AGENT_HEARTBEAT_TIMEOUT = 60            # Seconds before marking agent as offline
+SECRET_KEY = "..."                      # Flask session secret
+DATABASE_URI = "sqlite:///dashboard.db"
 ```
 
 ---
 
-## 9. User Interface Design
+## 5. Development Milestones
 
-### 9.1 Dashboard Layout
+### Milestone 1: Project Foundation
 
-- **Left Panel (25%)**: Input form with collapsible sections
-- **Right Panel (75%)**: Live preview grid (7 carousel images)
-- **Top Bar**: Project name, Save, Export buttons
+**Goal:** Set up the Flask application skeleton with dark theme and basic routing.
 
-### 9.2 Preview Grid Features
+- Initialize Flask project structure
+- Create base HTML template with dark theme CSS
+- Implement navigation between dashboard, agents, and issues views
+- Set up SQLite database with agent model
+- Add configuration management (config.py, environment variables)
+- Create requirements.txt with initial dependencies
 
-- Hero image larger at top
-- 6 supporting images in 2x3 grid with labels
-- Thumbnail carousel below each (3-4 AI variations)
-- Action buttons: Edit, Download, Upload, Regenerate
-- Drag & drop to reorder
+**Deliverable:** Running Flask app with dark-themed placeholder pages and working navigation.
 
-### 9.3 Image Editor Modal
+### Milestone 2: Agent Status Panel
 
-- Canvas preview with editable text layers
-- Click text to edit (font/size/color controls)
-- Background swap (regenerate background only)
-- Product repositioning (drag to adjust)
-- Save/Cancel buttons
+**Goal:** Build the agent monitoring interface with real-time status display.
 
----
+- Implement agent registration and database storage
+- Create API endpoint for agent heartbeat/status updates
+- Build agent list view with status indicators (online, idle, offline, error)
+- Add agent detail view with history and current task info
+- Implement heartbeat timeout logic (auto-mark offline)
+- Add filtering and sorting to agent list
 
-## 10. Output Specifications
+**Deliverable:** Functional agent status panel with live status updates and detail views.
 
-### 10.1 Technical Requirements
+### Milestone 3: GitHub Issues Integration
 
-| Spec | Requirement |
-|------|-------------|
-| Primary Resolution | 2000 x 2000 pixels |
-| Minimum Acceptable | 1000 x 1000 pixels |
-| File Format | PNG (primary), JPEG (compressed) |
-| Color Space | sRGB |
-| File Size | < 5MB per image |
-| Hero Background | Pure white (#FFFFFF) |
-| Text Legibility | Min 14pt at 1000px view |
+**Goal:** Connect to GitHub API and display issues in the dashboard.
 
-### 10.2 Export Package (ZIP)
+- Implement GitHub API client with authentication
+- Fetch and cache issues from configured repositories
+- Build issues list view with pagination
+- Add label-based filtering and sorting
+- Implement repository selector for multi-repo support
+- Add expandable issue detail with body and comment count
+- Configure auto-refresh interval for issue data
 
-```
-perfectasin_carousel_[ASIN]/
-├── 01_Hero_Main.png
-├── 02_Lifestyle_Origin.png
-├── 03_Infographic_Features.png
-├── 04_HowToUse.png
-├── 05_Size_Scale.png
-├── 06_UseCases_Recipes.png
-├── 07_SocialProof_Guarantee.png
-└── README.txt (upload instructions)
-```
+**Deliverable:** GitHub issues view with filtering, sorting, and auto-refresh.
 
----
+### Milestone 4: Dashboard Overview & Widgets
 
-## 11. Competitive Analysis Integration
+**Goal:** Create the summary landing page with key metrics and alerts.
 
-### 11.1 SERP Analysis
+- Build agent summary widget (counts by status)
+- Add open issue count widget with breakdown by repo
+- Implement recent activity timeline
+- Create milestone progress bars
+- Add alert cards for agents in error state or critical issues
+- Wire up auto-refresh for dashboard widgets
 
-1. Fetch Top 10 ASINs for primary keyword
-2. Extract carousel images from each
-3. Analyze image types used
-4. Identify common themes/colors
-5. Extract text overlays and headlines
-6. Generate "Best Practices" report
+**Deliverable:** Dashboard overview page with live summary widgets and alerts.
 
-### 11.2 Intelligence Output
+### Milestone 5: Polish & Deployment
 
-- Image Type Distribution: "7/10 competitors use How-To-Use"
-- Color Trends: "Dominant: Red (80%), Earth tones (60%)"
-- Trust Badge Usage: "Average 4.2 badges per carousel"
-- Gap Opportunities: "Only 2 show recipes - differentiation opportunity"
+**Goal:** Refine the UI, add final features, and prepare for deployment.
+
+- Responsive layout adjustments for various screen sizes
+- Keyboard shortcuts for common actions (refresh, filter toggle)
+- Error handling and graceful degradation (GitHub API failures, DB issues)
+- Loading states and skeleton screens
+- Configuration documentation
+- Deployment setup (systemd service, Docker option, or similar)
+- Final QA pass on dark theme consistency and accessibility
+
+**Deliverable:** Production-ready dashboard with documentation and deployment configuration.
 
 ---
 
-## 12. Development Roadmap
+## 6. Non-Functional Requirements
 
-### Phase 1: MVP (8 Weeks)
-
-- Week 1-2: GCP setup, Vertex AI integration, API scaffolding
-- Week 3-4: ASIN extraction, form UI, database schema
-- Week 5-6: Imagen integration, prompts, 3-layer composition
-- Week 7: Text validation, spell-check pipeline
-- Week 8: Export, QA, beta launch
-
-### Phase 2: Enhanced (4 Weeks)
-
-- SERP competitive analysis
-- Advanced image editor
-- AI-suggested ICP profiles
-- Additional theme presets
-
-### Phase 3: Scale (4 Weeks)
-
-- Subscription billing (Stripe)
-- Bulk generation
-- API access
-- White-label options
+| Requirement | Target |
+|-------------|--------|
+| Page Load Time | < 1 second for all views |
+| Auto-Refresh | Configurable, default 5 minutes for issues, 30 seconds for agents |
+| Browser Support | Chrome, Firefox, Safari (latest versions) |
+| Accessibility | WCAG AA contrast ratios for dark theme |
+| Security | GitHub token stored securely, no token exposure in frontend |
+| Data Freshness | Agent status within 60 seconds, issues within 5 minutes |
 
 ---
 
-## 13. Success Metrics
+## 7. Success Criteria
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Generation Time | < 15 minutes | ASIN input to export |
-| Spelling Errors | < 0.01% | OCR verification |
-| Amazon Compliance | > 99% | Validator pass rate |
-| User Satisfaction | NPS > 50 | Post-generation survey |
-| Completion Rate | > 85% | Full 7-image carousel |
-| Conversion Lift | 15-30% | User-reported before/after |
-| MAU (Year 1) | > 5,000 | Analytics |
-| CAC | < $50 | Marketing / new users |
-
----
-
-## Appendix: Key Prompts
-
-### ICP Generation
-
-```
-You are an expert Amazon marketing strategist.
-
-Product: {product_name}
-Category: {category}
-Price: {price}
-Features: {features}
-
-Generate 3 distinct ICPs with:
-1. Persona Name
-2. Demographics
-3. Psychographics
-4. Primary Pain Point
-5. Purchase Motivator
-
-Format: JSON array
-```
-
-### Headline Generation
-
-```
-You are an expert Amazon listing copywriter.
-
-Product: {product_name}
-ICP: {selected_icp}
-Image Type: {slot_type}
-
-Generate 5 headlines (max 5 words each).
-
-RULES:
-- American English
-- Action-oriented
-- Zero spelling errors
-- Match ICP tone
-```
+| Metric | Target |
+|--------|--------|
+| Agent Visibility | 100% of active agents displayed with correct status |
+| Issue Accuracy | All open issues from configured repos displayed |
+| Uptime | Dashboard available during working hours without manual restarts |
+| Team Adoption | Used daily by CC engineering team |
+| Response Time | All pages render in under 1 second |
 
 ---
 
 *End of Document*
 
-**Perfect ASIN** | PerfectASIN.com | PRD v2.0 | January 2026
+**CC Team Dashboard** | PRD v1.0 | February 2026
