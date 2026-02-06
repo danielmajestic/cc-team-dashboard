@@ -26,6 +26,14 @@ def create_app(testing=False):
     def dashboard():
         return render_template("dashboard.html")
 
+    @app.route("/agents")
+    def agents():
+        return render_template("agents.html")
+
+    @app.route("/issues")
+    def issues():
+        return render_template("issues.html")
+
     return app
 
 
