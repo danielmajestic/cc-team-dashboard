@@ -14,6 +14,14 @@ def create_app(testing=False):
     # Ensure instance folder exists
     os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
 
+    from models import init_db, get_db_connection
+
+    # Initialize database
+    if not testing:
+        db_conn = get_db_connection(app.config["DATABASE_PATH"])
+        init_db(db_conn)
+        db_conn.close()
+
     @app.route("/")
     def dashboard():
         return render_template("dashboard.html")
