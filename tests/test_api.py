@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch, MagicMock
 from app import create_app
 from models import get_db_connection
 
@@ -187,3 +188,59 @@ class TestHeartbeatTimeout:
         data = resp.get_json()
         fresh = [a for a in data if a["name"] == "fresh-agent"][0]
         assert fresh["status"] == "online"
+
+
+# --- GET /api/agents/<name>/terminal ---
+
+class TestTerminalEndpoint:
+    def test_terminal_returns_tmux_output(self, client):
+        """Should return captured tmux pane output."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "$ python app.py\nRunning on port 5000\n"
+
+        with patch("app.subprocess.run", return_value=mock_result) as mock_run:
+            resp = client.get("/api/agents/sam/terminal")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["name"] == "sam"
+            assert "Running on port 5000" in data["output"]
+            mock_run.assert_called_once_with(
+                ["tmux", "capture-pane", "-p", "-t", "sam", "-S", "-30"],
+                capture_output=True, text=True, timeout=5
+            )
+
+    def test_terminal_session_not_found(self, client):
+        """Should return 404 when tmux session doesn't exist."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "can't find session: noagent"
+
+        with patch("app.subprocess.run", return_value=mock_result):
+            resp = client.get("/api/agents/noagent/terminal")
+            assert resp.status_code == 404
+            data = resp.get_json()
+            assert "error" in data
+
+    def test_terminal_invalid_name_returns_400(self, client):
+        """Should reject names with special characters."""
+        resp = client.get("/api/agents/$(whoami)/terminal")
+        assert resp.status_code == 400
+
+    def test_terminal_tmux_not_installed(self, client):
+        """Should return 500 when tmux is not available."""
+        with patch("app.subprocess.run", side_effect=FileNotFoundError):
+            resp = client.get("/api/agents/sam/terminal")
+            assert resp.status_code == 500
+            data = resp.get_json()
+            assert "tmux is not installed" in data["error"]
+
+    def test_terminal_tmux_timeout(self, client):
+        """Should return 500 when tmux command hangs."""
+        import subprocess
+        with patch("app.subprocess.run",
+                   side_effect=subprocess.TimeoutExpired(cmd="tmux", timeout=5)):
+            resp = client.get("/api/agents/sam/terminal")
+            assert resp.status_code == 500
+            data = resp.get_json()
+            assert "timed out" in data["error"]

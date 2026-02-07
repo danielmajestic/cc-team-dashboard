@@ -112,3 +112,19 @@ def test_agents_table_wrapped_for_mobile(client):
     response = client.get("/agents")
     html = response.data.decode()
     assert "table-wrap" in html
+
+
+# --- Terminal live view section ---
+
+
+def test_agents_page_has_terminal_section(client):
+    response = client.get("/agents")
+    html = response.data.decode()
+    assert 'id="terminal-section"' in html
+    assert "Live Terminal Output" in html
+
+
+def test_agents_page_has_terminal_grid(client):
+    response = client.get("/agents")
+    html = response.data.decode()
+    assert 'id="terminal-grid"' in html
