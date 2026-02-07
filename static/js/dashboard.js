@@ -5,6 +5,7 @@
     'use strict';
 
     var REFRESH_INTERVAL = 30000;
+    var TERMINAL_REFRESH_INTERVAL = 10000;
     var AGENT_API = '/api/agents';
 
     // Known team role mappings
@@ -85,9 +86,14 @@
                 + '<div class="agent-task">' + escapeHtml(a.current_task || 'No active task') + '</div>'
                 + '<div class="agent-lastseen">Last seen: ' + timeAgo(a.last_active) + '</div>'
                 + '</div>'
+                + '<div class="agent-working" id="working-' + a.id + '"></div>'
                 + '</div>';
         }
         container.innerHTML = html;
+
+        for (var j = 0; j < agents.length; j++) {
+            fetchWorkingMd(agents[j].id, agents[j].name);
+        }
     }
 
     // Render agent table on the agents page
@@ -123,6 +129,110 @@
         return div.innerHTML;
     }
 
+    // --- Terminal live view (agents page) ---
+
+    var knownAgentNames = [];
+
+    function renderTerminalGrid(agents) {
+        var grid = document.getElementById('terminal-grid');
+        if (!grid) return;
+
+        knownAgentNames = [];
+        for (var i = 0; i < agents.length; i++) {
+            knownAgentNames.push(agents[i].name);
+        }
+
+        if (knownAgentNames.length === 0) {
+            grid.innerHTML = '<p class="empty-msg">No agents registered.</p>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < knownAgentNames.length; i++) {
+            var name = knownAgentNames[i];
+            html += '<div class="terminal-box" id="term-' + escapeHtml(name) + '">'
+                + '<div class="terminal-header">'
+                + '<span class="terminal-title">' + escapeHtml(name) + '</span>'
+                + '<span class="terminal-status" id="term-status-' + escapeHtml(name) + '">connecting...</span>'
+                + '</div>'
+                + '<div class="terminal-body" id="term-body-' + escapeHtml(name) + '">Loading...</div>'
+                + '</div>';
+        }
+        grid.innerHTML = html;
+        fetchAllTerminals();
+    }
+
+    function fetchTerminal(name) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/agents/' + encodeURIComponent(name) + '/terminal', true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            var body = document.getElementById('term-body-' + name);
+            var status = document.getElementById('term-status-' + name);
+            if (!body || !status) return;
+
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    var output = data.output || '';
+                    if (output.trim() === '') {
+                        body.innerHTML = '<span class="terminal-empty">No output</span>';
+                    } else {
+                        body.textContent = output;
+                    }
+                    status.textContent = 'live';
+                    status.style.color = '';
+                } catch (e) {
+                    body.innerHTML = '<span class="terminal-empty">Parse error</span>';
+                    status.textContent = 'error';
+                    status.style.color = 'var(--status-red)';
+                }
+            } else {
+                body.innerHTML = '<span class="terminal-empty">No tmux session</span>';
+                status.textContent = 'disconnected';
+                status.style.color = 'var(--status-red)';
+            }
+        };
+        xhr.send();
+    }
+
+    function fetchAllTerminals() {
+        for (var i = 0; i < knownAgentNames.length; i++) {
+            fetchTerminal(knownAgentNames[i]);
+        }
+    }
+
+    // --- WORKING.md display (dashboard cards) ---
+
+    function fetchWorkingMd(agentId, agentName) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/agents/' + agentId + '/working', true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            var container = document.getElementById('working-' + agentId);
+            if (!container) return;
+
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    var lines = (data.content || '').split('\n');
+                    var preview = lines.slice(0, 8).join('\n').trim();
+                    if (preview) {
+                        container.innerHTML = '<div class="agent-working-label">Working Status</div>'
+                            + '<div>' + escapeHtml(preview) + '</div>';
+                    } else {
+                        container.innerHTML = '';
+                    }
+                } catch (e) {
+                    container.innerHTML = '';
+                }
+            } else {
+                container.innerHTML = '';
+            }
+        };
+        xhr.send();
+    }
+
     // Fetch agents from API and update both views
     function fetchAgents() {
         var xhr = new XMLHttpRequest();
@@ -134,6 +244,7 @@
                     var agents = JSON.parse(xhr.responseText);
                     renderAgentCards(agents);
                     renderAgentTable(agents);
+                    renderTerminalGrid(agents);
                 } catch (e) {
                     showError('Failed to parse agent data.');
                 }
@@ -199,6 +310,11 @@
         fetchAgents();
         initFilters();
         setInterval(fetchAgents, REFRESH_INTERVAL);
+        setInterval(function () {
+            if (knownAgentNames.length > 0) {
+                fetchAllTerminals();
+            }
+        }, TERMINAL_REFRESH_INTERVAL);
     }
 
     if (document.readyState === 'loading') {

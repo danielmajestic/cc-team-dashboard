@@ -1,4 +1,6 @@
 import os
+import re
+import subprocess
 from flask import Flask, render_template, request, jsonify
 from config import Config, TestConfig
 
@@ -111,6 +113,27 @@ def create_app(testing=False, db_path_override=None):
             "agent_name": agent["name"],
             "content": content,
         }), 200
+
+    @app.route("/api/agents/<name>/terminal", methods=["GET"])
+    def api_agent_terminal(name):
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', name):
+            return jsonify({"error": "invalid agent name"}), 400
+
+        try:
+            result = subprocess.run(
+                ["tmux", "capture-pane", "-p", "-t", name, "-S", "-30"],
+                capture_output=True, text=True, timeout=5
+            )
+        except FileNotFoundError:
+            return jsonify({"error": "tmux is not installed"}), 500
+        except subprocess.TimeoutExpired:
+            return jsonify({"error": "tmux command timed out"}), 500
+
+        if result.returncode != 0:
+            return jsonify({"error": "tmux session not found",
+                            "detail": result.stderr.strip()}), 404
+
+        return jsonify({"name": name, "output": result.stdout}), 200
 
     @app.route("/api/agents", methods=["GET"])
     def api_list_agents():
