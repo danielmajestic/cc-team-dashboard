@@ -187,3 +187,65 @@ class TestHeartbeatTimeout:
         data = resp.get_json()
         fresh = [a for a in data if a["name"] == "fresh-agent"][0]
         assert fresh["status"] == "online"
+
+
+# --- GET /api/agents/<id>/working ---
+
+class TestWorkingEndpoint:
+    def _register(self, client, name="Kat"):
+        resp = client.post("/api/agents/register", json={
+            "name": name, "role": "backend", "status": "online"
+        })
+        return resp.get_json()
+
+    def test_working_returns_file_content(self, app, client, tmp_path):
+        """Should return WORKING.md content for a registered agent."""
+        agent = self._register(client, "Kat")
+
+        # Create a fake WORKING.md
+        agent_dir = tmp_path / "kat"
+        agent_dir.mkdir()
+        working_file = agent_dir / "WORKING.md"
+        working_file.write_text("## Current Task\nWorking on issue #7\n")
+
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "content" in data
+        assert "Working on issue #7" in data["content"]
+        assert data["agent_name"] == "Kat"
+
+    def test_working_nonexistent_agent_returns_404(self, client):
+        """Should return 404 for unknown agent ID."""
+        resp = client.get("/api/agents/9999/working")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_working_missing_file_returns_404(self, app, client, tmp_path):
+        """Should return 404 if WORKING.md doesn't exist for the agent."""
+        agent = self._register(client, "Kat")
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_working_uses_lowercase_agent_name(self, app, client, tmp_path):
+        """Should map agent name to lowercase directory."""
+        agent = self._register(client, "Sam")
+
+        agent_dir = tmp_path / "sam"
+        agent_dir.mkdir()
+        (agent_dir / "WORKING.md").write_text("Sam's work log")
+
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["content"] == "Sam's work log"
+        assert data["agent_name"] == "Sam"
