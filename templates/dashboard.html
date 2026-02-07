@@ -2,5 +2,17 @@
 {% block title %}Dashboard — CC Team Dashboard{% endblock %}
 {% block content %}
 <h1>Dashboard</h1>
-<p>Overview widgets will appear here.</p>
+
+<section class="agent-summary">
+    <h2>Agent Status</h2>
+    <div class="status-filter" id="dashboard-status-filter">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="online">Online</button>
+        <button class="filter-btn" data-filter="busy">Busy</button>
+        <button class="filter-btn" data-filter="offline">Offline</button>
+    </div>
+    <div class="agent-cards" id="agent-cards">
+        <p class="loading-msg">Loading agents...</p>
+    </div>
+</section>
 {% endblock %}

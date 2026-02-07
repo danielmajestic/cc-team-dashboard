@@ -75,3 +75,228 @@ h1 {
     color: var(--text-heading);
     margin-bottom: 1rem;
 }
+
+h2 {
+    color: var(--text-heading);
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge.online {
+    background-color: rgba(78, 204, 163, 0.15);
+    color: var(--status-green);
+    border: 1px solid var(--status-green);
+}
+
+.status-badge.busy {
+    background-color: rgba(240, 192, 64, 0.15);
+    color: var(--status-yellow);
+    border: 1px solid var(--status-yellow);
+}
+
+.status-badge.idle {
+    background-color: rgba(240, 192, 64, 0.15);
+    color: var(--status-yellow);
+    border: 1px solid var(--status-yellow);
+}
+
+.status-badge.offline {
+    background-color: rgba(231, 76, 60, 0.15);
+    color: var(--status-red);
+    border: 1px solid var(--status-red);
+}
+
+.status-badge.error {
+    background-color: rgba(243, 156, 18, 0.15);
+    color: var(--status-orange);
+    border: 1px solid var(--status-orange);
+}
+
+/* Agent Cards Grid */
+.agent-cards {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+@media (min-width: 576px) {
+    .agent-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 992px) {
+    .agent-cards {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.agent-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: border-color 0.2s;
+}
+
+.agent-card:hover {
+    border-color: var(--accent-highlight);
+}
+
+.agent-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.agent-name {
+    color: var(--text-heading);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.agent-card-body {
+    font-size: 0.875rem;
+}
+
+.agent-role {
+    color: var(--accent-highlight);
+    margin-bottom: 0.35rem;
+}
+
+.agent-task {
+    color: var(--text-primary);
+    margin-bottom: 0.35rem;
+    opacity: 0.8;
+}
+
+.agent-lastseen {
+    color: var(--text-primary);
+    opacity: 0.6;
+    font-size: 0.8rem;
+}
+
+/* Agent Summary Section */
+.agent-summary {
+    margin-bottom: 2rem;
+}
+
+/* Status Filter Buttons */
+.status-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.filter-btn {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--accent);
+    padding: 0.35rem 0.85rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.filter-btn:hover {
+    border-color: var(--accent-highlight);
+}
+
+.filter-btn.active {
+    background-color: var(--accent);
+    color: var(--accent-highlight);
+    border-color: var(--accent-highlight);
+}
+
+/* Agent Table */
+.table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.agent-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.agent-table th,
+.agent-table td {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--accent);
+}
+
+.agent-table th {
+    color: var(--text-heading);
+    font-weight: 600;
+    background-color: var(--bg-surface);
+    position: sticky;
+    top: 0;
+}
+
+.agent-table tbody tr {
+    transition: background-color 0.15s;
+}
+
+.agent-table tbody tr:hover {
+    background-color: var(--bg-surface);
+}
+
+/* Messages */
+.loading-msg,
+.empty-msg {
+    color: var(--text-primary);
+    opacity: 0.6;
+    padding: 2rem 0;
+    text-align: center;
+}
+
+.error-msg {
+    color: var(--status-red);
+    padding: 2rem 0;
+    text-align: center;
+}
+
+/* Mobile-first nav adjustments */
+@media (max-width: 575px) {
+    .main-nav {
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .nav-links {
+        gap: 0.5rem;
+    }
+
+    .nav-links a {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.875rem;
+    }
+
+    .content {
+        padding: 1rem;
+    }
+
+    .agent-table th,
+    .agent-table td {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.8rem;
+    }
+}
