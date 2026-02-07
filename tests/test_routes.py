@@ -155,3 +155,20 @@ def test_dashboard_js_renders_working_container(client):
     js = response.data.decode()
     assert "working-" in js
     assert "agent-working" in js
+
+
+def test_dashboard_js_uses_content_html(client):
+    """dashboard.js should use content_html for rendered markdown."""
+    response = client.get("/static/js/dashboard.js")
+    js = response.data.decode()
+    assert "content_html" in js
+    assert "working-md-rendered" in js
+
+
+def test_css_has_rendered_markdown_styles(client):
+    """style.css should include styles for rendered markdown."""
+    response = client.get("/static/css/style.css")
+    css = response.data.decode()
+    assert ".working-md-rendered" in css
+    assert ".working-md-rendered h2" in css
+    assert ".working-md-rendered strong" in css

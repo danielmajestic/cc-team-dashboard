@@ -1,3 +1,4 @@
+import io
 import json
 import pytest
 from unittest.mock import patch, MagicMock
@@ -447,3 +448,196 @@ class TestActivityFeed:
             assert resp.status_code == 200
             data = resp.get_json()
             assert len(data) <= 20
+
+
+# --- Slack user ID resolution ---
+
+class TestSlackUserResolution:
+    def _make_slack_response(self, messages):
+        """Build a mock urlopen context manager returning Slack messages."""
+        slack_resp = json.dumps({
+            "ok": True,
+            "messages": messages,
+        }).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = slack_resp
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def _make_user_info_response(self, display_name="", real_name=""):
+        """Build a mock urlopen context manager returning users.info data."""
+        user_resp = json.dumps({
+            "ok": True,
+            "user": {
+                "real_name": real_name,
+                "profile": {"display_name": display_name},
+            },
+        }).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = user_resp
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def test_resolves_user_id_to_display_name(self, app, client):
+        """Slack events should show display_name instead of raw user ID."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0AAA5ZK6EB", "text": "hello", "ts": "1705312800.000"}
+        ])
+        user_info = self._make_user_info_response(display_name="Alice")
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                return user_info
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert len(slack_events) == 1
+                assert slack_events[0]["agent"] == "Alice"
+
+    def test_falls_back_to_real_name(self, app, client):
+        """Should use real_name when display_name is empty."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0BBB", "text": "hi", "ts": "1705312800.000"}
+        ])
+        user_info = self._make_user_info_response(display_name="", real_name="Bob Smith")
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                return user_info
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert slack_events[0]["agent"] == "Bob Smith"
+
+    def test_falls_back_to_raw_id_on_api_failure(self, app, client):
+        """Should use raw user ID if users.info API fails."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0CCC", "text": "hey", "ts": "1705312800.000"}
+        ])
+
+        call_count = [0]
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                import urllib.error
+                raise urllib.error.URLError("network error")
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert slack_events[0]["agent"] == "U0CCC"
+
+    def test_caches_resolved_users(self, app, client):
+        """Should only call users.info once per unique user ID."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0DDD", "text": "msg1", "ts": "1705312800.000"},
+            {"user": "U0DDD", "text": "msg2", "ts": "1705312801.000"},
+        ])
+        user_info = self._make_user_info_response(display_name="Dave")
+
+        urlopen_calls = []
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            urlopen_calls.append(url)
+            if "users.info" in url:
+                return user_info
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert len(slack_events) == 2
+                assert all(e["agent"] == "Dave" for e in slack_events)
+                # users.info should only be called once (not twice)
+                user_info_calls = [u for u in urlopen_calls if "users.info" in u]
+                assert len(user_info_calls) == 1
+
+
+# --- WORKING.md HTML rendering ---
+
+class TestWorkingHtmlRendering:
+    def _register(self, client, name="Kat"):
+        resp = client.post("/api/agents/register", json={
+            "name": name, "role": "backend", "status": "online"
+        })
+        return resp.get_json()
+
+    def test_working_returns_html_content(self, app, client, tmp_path):
+        """Should return content_html with rendered markdown."""
+        agent = self._register(client, "Kat")
+        agent_dir = tmp_path / "kat"
+        agent_dir.mkdir()
+        (agent_dir / "WORKING.md").write_text("## Current Task\n**Working** on issue #7\n")
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "content_html" in data
+        assert "<h2>" in data["content_html"]
+        assert "<strong>Working</strong>" in data["content_html"]
+
+    def test_working_still_returns_raw_content(self, app, client, tmp_path):
+        """Should still return raw content alongside HTML."""
+        agent = self._register(client, "Kat")
+        agent_dir = tmp_path / "kat"
+        agent_dir.mkdir()
+        (agent_dir / "WORKING.md").write_text("plain text")
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        data = resp.get_json()
+        assert data["content"] == "plain text"
+        assert "content_html" in data
+
+    def test_working_renders_lists(self, app, client, tmp_path):
+        """Should render markdown lists as HTML."""
+        agent = self._register(client, "Kat")
+        agent_dir = tmp_path / "kat"
+        agent_dir.mkdir()
+        (agent_dir / "WORKING.md").write_text("- item one\n- item two\n")
+        app.config["AGENTS_BASE_PATH"] = str(tmp_path)
+
+        resp = client.get(f"/api/agents/{agent['id']}/working")
+        data = resp.get_json()
+        assert "<ul>" in data["content_html"]
+        assert "<li>" in data["content_html"]

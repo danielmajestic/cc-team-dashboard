@@ -216,11 +216,10 @@
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    var lines = (data.content || '').split('\n');
-                    var preview = lines.slice(0, 8).join('\n').trim();
-                    if (preview) {
+                    var html = data.content_html || '';
+                    if (html.trim()) {
                         container.innerHTML = '<div class="agent-working-label">Working Status</div>'
-                            + '<div>' + escapeHtml(preview) + '</div>';
+                            + '<div class="working-md-rendered">' + html + '</div>';
                     } else {
                         container.innerHTML = '';
                     }

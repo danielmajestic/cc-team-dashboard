@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 from datetime import datetime, timezone
+import markdown
 from flask import Flask, render_template, request, jsonify
 from config import Config, TestConfig
 
@@ -20,6 +21,42 @@ def create_app(testing=False, db_path_override=None):
 
     # Ensure instance folder exists
     os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
+
+    # Slack user ID -> display name cache
+    _slack_user_cache = {}
+
+    def resolve_slack_user(user_id, token):
+        """Resolve a Slack user ID to a display name via users.info API.
+
+        Results are cached in _slack_user_cache. Falls back to the raw
+        user_id if the lookup fails.
+        """
+        import urllib.request
+        import urllib.error
+
+        if user_id in _slack_user_cache:
+            return _slack_user_cache[user_id]
+
+        try:
+            url = f"https://slack.com/api/users.info?user={user_id}"
+            req = urllib.request.Request(url, headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            })
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode())
+            if data.get("ok"):
+                profile = data["user"].get("profile", {})
+                name = (profile.get("display_name")
+                        or data["user"].get("real_name")
+                        or user_id)
+                _slack_user_cache[user_id] = name
+                return name
+        except (urllib.error.URLError, OSError, ValueError, KeyError):
+            pass
+
+        _slack_user_cache[user_id] = user_id
+        return user_id
 
     from models import init_db, get_db_connection
 
@@ -111,9 +148,12 @@ def create_app(testing=False, db_path_override=None):
         with open(working_path, "r") as f:
             content = f.read()
 
+        content_html = markdown.markdown(content)
+
         return jsonify({
             "agent_name": agent["name"],
             "content": content,
+            "content_html": content_html,
         }), 200
 
     @app.route("/api/agents/<name>/terminal", methods=["GET"])
@@ -259,10 +299,14 @@ def create_app(testing=False, db_path_override=None):
                                 ).isoformat()
                             except (ValueError, OSError):
                                 dt = ""
+                            raw_user = msg.get("user", "unknown")
+                            display_name = resolve_slack_user(
+                                raw_user, token
+                            ) if raw_user != "unknown" else "unknown"
                             events.append({
                                 "type": "slack",
                                 "timestamp": dt,
-                                "agent": msg.get("user", "unknown"),
+                                "agent": display_name,
                                 "message": (msg.get("text", "")[:200])
                             })
                 except (urllib.error.URLError, OSError, ValueError):

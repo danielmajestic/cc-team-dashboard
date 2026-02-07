@@ -360,6 +360,57 @@ h2 {
     font-weight: 600;
 }
 
+/* Rendered markdown inside agent cards */
+.working-md-rendered {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.working-md-rendered h1,
+.working-md-rendered h2,
+.working-md-rendered h3,
+.working-md-rendered h4 {
+    color: var(--text-heading);
+    margin: 0.3rem 0 0.15rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.working-md-rendered h1 { font-size: 0.95rem; }
+
+.working-md-rendered p {
+    margin: 0.15rem 0;
+}
+
+.working-md-rendered strong {
+    color: var(--text-heading);
+}
+
+.working-md-rendered ul,
+.working-md-rendered ol {
+    margin: 0.15rem 0;
+    padding-left: 1.2rem;
+}
+
+.working-md-rendered code {
+    background-color: rgba(83, 216, 251, 0.1);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+}
+
+.working-md-rendered pre {
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 0.4rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.working-md-rendered a {
+    color: var(--accent-highlight);
+}
+
 /* Dashboard Header with Heartbeat Toggle */
 .dashboard-header {
     display: flex;
