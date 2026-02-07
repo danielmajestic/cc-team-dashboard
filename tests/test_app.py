@@ -3,8 +3,9 @@ from app import create_app
 
 
 @pytest.fixture
-def app():
-    app = create_app(testing=True)
+def app(tmp_path):
+    db_path = str(tmp_path / "test.db")
+    app = create_app(testing=True, db_path_override=db_path)
     yield app
 
 

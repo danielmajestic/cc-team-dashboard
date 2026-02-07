@@ -3,8 +3,9 @@ from app import create_app
 
 
 @pytest.fixture
-def client():
-    app = create_app(testing=True)
+def client(tmp_path):
+    db_path = str(tmp_path / "test.db")
+    app = create_app(testing=True, db_path_override=db_path)
     return app.test_client()
 
 
