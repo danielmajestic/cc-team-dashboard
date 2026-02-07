@@ -128,3 +128,30 @@ def test_agents_page_has_terminal_grid(client):
     response = client.get("/agents")
     html = response.data.decode()
     assert 'id="terminal-grid"' in html
+
+
+# --- WORKING.md display in agent cards ---
+
+
+def test_dashboard_js_has_working_md_fetch(client):
+    """dashboard.js should contain the fetchWorkingMd function."""
+    response = client.get("/static/js/dashboard.js")
+    js = response.data.decode()
+    assert "fetchWorkingMd" in js
+    assert "/working" in js
+
+
+def test_css_has_working_styles(client):
+    """style.css should include working display styles."""
+    response = client.get("/static/css/style.css")
+    css = response.data.decode()
+    assert ".agent-working" in css
+    assert ".agent-working-label" in css
+
+
+def test_dashboard_js_renders_working_container(client):
+    """dashboard.js should render working-<id> containers in agent cards."""
+    response = client.get("/static/js/dashboard.js")
+    js = response.data.decode()
+    assert "working-" in js
+    assert "agent-working" in js
