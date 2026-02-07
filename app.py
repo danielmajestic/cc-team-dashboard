@@ -82,6 +82,36 @@ def create_app(testing=False, db_path_override=None):
         finally:
             conn.close()
 
+    @app.route("/api/agents/<int:agent_id>/working", methods=["GET"])
+    def api_working(agent_id):
+        from models import get_agent
+
+        conn = get_db_connection(app.config["DATABASE_PATH"])
+        try:
+            agent = get_agent(conn, agent_id)
+            if agent is None:
+                return jsonify({"error": "agent not found"}), 404
+        finally:
+            conn.close()
+
+        agents_base = app.config.get(
+            "AGENTS_BASE_PATH",
+            os.path.expanduser("~/agents")
+        )
+        name_lower = agent["name"].lower()
+        working_path = os.path.join(agents_base, name_lower, "WORKING.md")
+
+        if not os.path.isfile(working_path):
+            return jsonify({"error": "WORKING.md not found"}), 404
+
+        with open(working_path, "r") as f:
+            content = f.read()
+
+        return jsonify({
+            "agent_name": agent["name"],
+            "content": content,
+        }), 200
+
     @app.route("/api/agents", methods=["GET"])
     def api_list_agents():
         from models import get_all_agents, check_heartbeat_timeouts
