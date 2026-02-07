@@ -2,5 +2,31 @@
 {% block title %}Agents — CC Team Dashboard{% endblock %}
 {% block content %}
 <h1>Agents</h1>
-<p>Agent status panel will appear here.</p>
+
+<div class="status-filter" id="agents-status-filter">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="online">Online</button>
+    <button class="filter-btn" data-filter="busy">Busy</button>
+    <button class="filter-btn" data-filter="idle">Idle</button>
+    <button class="filter-btn" data-filter="offline">Offline</button>
+    <button class="filter-btn" data-filter="error">Error</button>
+</div>
+
+<div class="table-wrap">
+    <table class="agent-table" id="agent-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Current Task</th>
+                <th>Last Active</th>
+                <th>Uptime</th>
+            </tr>
+        </thead>
+        <tbody id="agent-table-body">
+            <tr><td colspan="6" class="loading-msg">Loading agents...</td></tr>
+        </tbody>
+    </table>
+</div>
 {% endblock %}
