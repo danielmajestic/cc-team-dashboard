@@ -1,7 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — CC Team Dashboard{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
+<div class="dashboard-header">
+    <h1>Dashboard</h1>
+    <div class="heartbeat-toggle" id="heartbeat-toggle">
+        <span class="heartbeat-label">Heartbeat</span>
+        <button class="toggle-btn" id="toggle-btn" title="Toggle heartbeat service">
+            <span class="toggle-indicator" id="toggle-indicator"></span>
+        </button>
+        <span class="toggle-status" id="toggle-status">...</span>
+    </div>
+</div>
 
 <section class="agent-summary">
     <h2>Agent Status</h2>
@@ -13,6 +22,13 @@
     </div>
     <div class="agent-cards" id="agent-cards">
         <p class="loading-msg">Loading agents...</p>
+    </div>
+</section>
+
+<section class="activity-section">
+    <h2>Recent Activity</h2>
+    <div class="activity-feed" id="activity-feed">
+        <p class="loading-msg">Loading activity...</p>
     </div>
 </section>
 {% endblock %}

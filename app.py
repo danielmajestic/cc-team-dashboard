@@ -1,6 +1,8 @@
+import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, jsonify
 from config import Config, TestConfig
 
@@ -147,6 +149,129 @@ def create_app(testing=False, db_path_override=None):
             return jsonify(agents), 200
         finally:
             conn.close()
+
+    # --- Heartbeat toggle ---
+
+    @app.route("/api/heartbeat/status", methods=["GET"])
+    def api_heartbeat_status():
+        hb_file = app.config.get(
+            "HEARTBEAT_FILE",
+            os.path.expanduser("~/agents/shared/.heartbeat-active")
+        )
+        try:
+            with open(hb_file, "r") as f:
+                state = f.read().strip().lower()
+            return jsonify({"active": state == "on"}), 200
+        except FileNotFoundError:
+            return jsonify({"active": False}), 200
+
+    @app.route("/api/heartbeat/toggle", methods=["POST"])
+    def api_heartbeat_toggle():
+        hb_file = app.config.get(
+            "HEARTBEAT_FILE",
+            os.path.expanduser("~/agents/shared/.heartbeat-active")
+        )
+        try:
+            with open(hb_file, "r") as f:
+                current = f.read().strip().lower()
+        except FileNotFoundError:
+            current = "off"
+
+        new_state = "off" if current == "on" else "on"
+        with open(hb_file, "w") as f:
+            f.write(new_state + "\n")
+
+        return jsonify({"active": new_state == "on"}), 200
+
+    # --- Activity feed ---
+
+    @app.route("/api/activity", methods=["GET"])
+    def api_activity():
+        from models import get_all_agents
+        import urllib.request
+        import urllib.error
+
+        events = []
+
+        # 1. Git commits
+        project_dir = app.config.get(
+            "PROJECT_DIR",
+            os.path.expanduser("~/projects/cc-team-dashboard")
+        )
+        try:
+            result = subprocess.run(
+                ["git", "log", "--format=%h||%an||%s||%aI", "-20"],
+                capture_output=True, text=True, timeout=5,
+                cwd=project_dir
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split("\n"):
+                    if not line.strip():
+                        continue
+                    parts = line.split("||", 3)
+                    if len(parts) == 4:
+                        events.append({
+                            "type": "commit",
+                            "timestamp": parts[3],
+                            "agent": parts[1],
+                            "message": f"{parts[0]} {parts[2]}"
+                        })
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # 2. Heartbeat events from DB
+        conn = get_db_connection(app.config["DATABASE_PATH"])
+        try:
+            agents = get_all_agents(conn)
+            for a in agents:
+                if a.get("last_active"):
+                    events.append({
+                        "type": "heartbeat",
+                        "timestamp": a["last_active"],
+                        "agent": a["name"],
+                        "message": f"Heartbeat from {a['name']} — {a.get('status', 'unknown')}"
+                    })
+        finally:
+            conn.close()
+
+        # 3. Slack messages
+        token = app.config.get("SLACK_BOT_TOKEN", "")
+        channels = app.config.get("SLACK_CHANNELS", [])
+        if token and channels:
+            for channel_id in channels:
+                try:
+                    url = (
+                        f"https://slack.com/api/conversations.history"
+                        f"?channel={channel_id}&limit=10"
+                    )
+                    req = urllib.request.Request(url, headers={
+                        "Authorization": f"Bearer {token}",
+                        "Content-Type": "application/json"
+                    })
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        data = json.loads(resp.read().decode())
+                    if data.get("ok"):
+                        for msg in data.get("messages", []):
+                            ts = msg.get("ts", "0")
+                            try:
+                                dt = datetime.fromtimestamp(
+                                    float(ts), tz=timezone.utc
+                                ).isoformat()
+                            except (ValueError, OSError):
+                                dt = ""
+                            events.append({
+                                "type": "slack",
+                                "timestamp": dt,
+                                "agent": msg.get("user", "unknown"),
+                                "message": (msg.get("text", "")[:200])
+                            })
+                except (urllib.error.URLError, OSError, ValueError):
+                    pass
+
+        # Sort by timestamp descending
+        events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
+
+        return jsonify(events[:20]), 200
 
     return app
 

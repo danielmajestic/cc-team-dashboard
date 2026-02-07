@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import patch, MagicMock
 from app import create_app
@@ -306,3 +307,143 @@ class TestTerminalEndpoint:
             assert resp.status_code == 500
             data = resp.get_json()
             assert "timed out" in data["error"]
+
+
+# --- GET /api/heartbeat/status ---
+
+class TestHeartbeatStatus:
+    def test_status_returns_active_true_when_on(self, app, client, tmp_path):
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("on\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        resp = client.get("/api/heartbeat/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is True
+
+    def test_status_returns_active_false_when_off(self, app, client, tmp_path):
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        resp = client.get("/api/heartbeat/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is False
+
+    def test_status_returns_false_when_file_missing(self, app, client, tmp_path):
+        app.config["HEARTBEAT_FILE"] = str(tmp_path / "nonexistent")
+
+        resp = client.get("/api/heartbeat/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is False
+
+
+# --- POST /api/heartbeat/toggle ---
+
+class TestHeartbeatToggle:
+    def test_toggle_flips_on_to_off(self, app, client, tmp_path):
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("on\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is False
+        assert hb_file.read_text().strip() == "off"
+
+    def test_toggle_flips_off_to_on(self, app, client, tmp_path):
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is True
+        assert hb_file.read_text().strip() == "on"
+
+    def test_toggle_creates_file_when_missing(self, app, client, tmp_path):
+        hb_file = tmp_path / ".heartbeat-active"
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is True
+        assert hb_file.read_text().strip() == "on"
+
+
+# --- GET /api/activity ---
+
+class TestActivityFeed:
+    def test_activity_returns_git_commits(self, app, client):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = (
+            "abc1234||Dan||Initial commit||2025-01-15T10:00:00+00:00\n"
+            "def5678||Kat||Add models||2025-01-15T09:00:00+00:00\n"
+        )
+
+        with patch("app.subprocess.run", return_value=mock_result):
+            resp = client.get("/api/activity")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            commits = [e for e in data if e["type"] == "commit"]
+            assert len(commits) == 2
+            assert "abc1234" in commits[0]["message"]
+            assert commits[0]["agent"] == "Dan"
+
+    def test_activity_returns_heartbeat_events(self, app, client):
+        # Register an agent first
+        client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+
+        with patch("app.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout="")
+            resp = client.get("/api/activity")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            heartbeats = [e for e in data if e["type"] == "heartbeat"]
+            assert len(heartbeats) >= 1
+            assert heartbeats[0]["agent"] == "kat"
+
+    def test_activity_sorted_by_timestamp_desc(self, app, client):
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = (
+            "aaa1111||Dan||Older commit||2025-01-10T08:00:00+00:00\n"
+            "bbb2222||Kat||Newer commit||2025-01-15T12:00:00+00:00\n"
+        )
+
+        with patch("app.subprocess.run", return_value=mock_result):
+            resp = client.get("/api/activity")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            if len(data) >= 2:
+                assert data[0]["timestamp"] >= data[1]["timestamp"]
+
+    def test_activity_handles_git_failure(self, app, client):
+        """Should return events even if git fails."""
+        with patch("app.subprocess.run",
+                   side_effect=FileNotFoundError):
+            resp = client.get("/api/activity")
+            assert resp.status_code == 200
+
+    def test_activity_returns_max_20(self, app, client):
+        lines = ""
+        for i in range(25):
+            lines += f"abc{i:04d}||Dan||Commit {i}||2025-01-{15 - (i % 15):02d}T10:00:00+00:00\n"
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = lines
+
+        with patch("app.subprocess.run", return_value=mock_result):
+            resp = client.get("/api/activity")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert len(data) <= 20

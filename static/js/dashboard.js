@@ -6,6 +6,7 @@
 
     var REFRESH_INTERVAL = 30000;
     var TERMINAL_REFRESH_INTERVAL = 10000;
+    var ACTIVITY_REFRESH_INTERVAL = 15000;
     var AGENT_API = '/api/agents';
 
     // Known team role mappings
@@ -305,16 +306,131 @@
         }
     }
 
+    // --- Heartbeat toggle ---
+
+    function updateToggleUI(active) {
+        var btn = document.getElementById('toggle-btn');
+        var status = document.getElementById('toggle-status');
+        if (!btn || !status) return;
+
+        if (active) {
+            btn.classList.add('active');
+            status.textContent = 'ON';
+            status.className = 'toggle-status on';
+        } else {
+            btn.classList.remove('active');
+            status.textContent = 'OFF';
+            status.className = 'toggle-status off';
+        }
+    }
+
+    function fetchHeartbeatStatus() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/heartbeat/status', true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    updateToggleUI(data.active);
+                } catch (e) { /* ignore */ }
+            }
+        };
+        xhr.send();
+    }
+
+    function initHeartbeatToggle() {
+        var btn = document.getElementById('toggle-btn');
+        if (!btn) return;
+
+        fetchHeartbeatStatus();
+
+        btn.addEventListener('click', function () {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/heartbeat/toggle', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                if (xhr.status === 200) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
+                        updateToggleUI(data.active);
+                    } catch (e) { /* ignore */ }
+                }
+            };
+            xhr.send('{}');
+        });
+    }
+
+    // --- Activity feed ---
+
+    var ACTIVITY_ICONS = {
+        commit: '\u25CF',
+        heartbeat: '\u2665',
+        slack: '\u0023'
+    };
+
+    function renderActivityFeed(events) {
+        var container = document.getElementById('activity-feed');
+        if (!container) return;
+
+        if (!events || events.length === 0) {
+            container.innerHTML = '<p class="empty-msg">No recent activity.</p>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < events.length; i++) {
+            var e = events[i];
+            var icon = ACTIVITY_ICONS[e.type] || '\u2022';
+            var iconClass = e.type || 'commit';
+            html += '<div class="activity-item">'
+                + '<span class="activity-icon ' + iconClass + '">' + icon + '</span>'
+                + '<div class="activity-body">'
+                + '<span class="activity-agent">' + escapeHtml(e.agent) + '</span>'
+                + '<span class="activity-message">' + escapeHtml(e.message) + '</span>'
+                + '</div>'
+                + '<span class="activity-time">' + timeAgo(e.timestamp) + '</span>'
+                + '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function fetchActivity() {
+        var container = document.getElementById('activity-feed');
+        if (!container) return;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/activity', true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            if (xhr.status === 200) {
+                try {
+                    var events = JSON.parse(xhr.responseText);
+                    renderActivityFeed(events);
+                } catch (e) {
+                    container.innerHTML = '<p class="error-msg">Failed to parse activity.</p>';
+                }
+            } else {
+                container.innerHTML = '<p class="error-msg">Error loading activity.</p>';
+            }
+        };
+        xhr.send();
+    }
+
     // Initialize on DOM ready
     function init() {
         fetchAgents();
         initFilters();
+        initHeartbeatToggle();
+        fetchActivity();
         setInterval(fetchAgents, REFRESH_INTERVAL);
         setInterval(function () {
             if (knownAgentNames.length > 0) {
                 fetchAllTerminals();
             }
         }, TERMINAL_REFRESH_INTERVAL);
+        setInterval(fetchActivity, ACTIVITY_REFRESH_INTERVAL);
     }
 
     if (document.readyState === 'loading') {

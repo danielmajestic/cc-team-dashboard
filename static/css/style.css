@@ -360,6 +360,154 @@ h2 {
     font-weight: 600;
 }
 
+/* Dashboard Header with Heartbeat Toggle */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.heartbeat-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.heartbeat-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.toggle-btn {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    background-color: var(--status-red);
+    transition: background-color 0.25s;
+    padding: 0;
+}
+
+.toggle-btn.active {
+    background-color: var(--status-green);
+}
+
+.toggle-indicator {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: #fff;
+    transition: transform 0.25s;
+}
+
+.toggle-btn.active .toggle-indicator {
+    transform: translateX(20px);
+}
+
+.toggle-status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.toggle-status.on {
+    color: var(--status-green);
+}
+
+.toggle-status.off {
+    color: var(--status-red);
+}
+
+/* Activity Feed */
+.activity-section {
+    margin-top: 2rem;
+}
+
+.activity-feed {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    max-height: 500px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid rgba(15, 52, 96, 0.5);
+    font-size: 0.85rem;
+    transition: background-color 0.15s;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    background-color: rgba(15, 52, 96, 0.3);
+}
+
+.activity-icon {
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.activity-icon.commit {
+    color: var(--status-green);
+}
+
+.activity-icon.heartbeat {
+    color: var(--accent-highlight);
+}
+
+.activity-icon.slack {
+    color: #a78bfa;
+}
+
+.activity-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-agent {
+    font-weight: 600;
+    color: var(--text-heading);
+    margin-right: 0.4rem;
+}
+
+.activity-message {
+    color: var(--text-primary);
+    opacity: 0.85;
+    word-break: break-word;
+}
+
+.activity-time {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    opacity: 0.5;
+    white-space: nowrap;
+    padding-top: 0.1rem;
+}
+
 /* Mobile-first nav adjustments */
 @media (max-width: 575px) {
     .main-nav {

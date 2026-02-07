@@ -18,6 +18,20 @@ class Config:
     ]
     ISSUE_REFRESH_INTERVAL = int(os.environ.get("ISSUE_REFRESH_INTERVAL", "300"))
     AGENT_HEARTBEAT_TIMEOUT = int(os.environ.get("AGENT_HEARTBEAT_TIMEOUT", "60"))
+    HEARTBEAT_FILE = os.environ.get(
+        "HEARTBEAT_FILE",
+        os.path.expanduser("~/agents/shared/.heartbeat-active")
+    )
+    SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
+    SLACK_CHANNELS = [
+        c.strip()
+        for c in os.environ.get("SLACK_CHANNELS", "").split(",")
+        if c.strip()
+    ]
+    PROJECT_DIR = os.environ.get(
+        "PROJECT_DIR",
+        os.path.expanduser("~/projects/cc-team-dashboard")
+    )
 
 
 class TestConfig(Config):
