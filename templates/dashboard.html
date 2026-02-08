@@ -3,12 +3,14 @@
 {% block content %}
 <div class="dashboard-header">
     <h1>Dashboard</h1>
-    <div class="heartbeat-toggle" id="heartbeat-toggle">
+    <div class="heartbeat-toggle" id="heartbeat-toggle" {% if is_admin %}data-admin-mode="true"{% endif %}>
         <span class="heartbeat-label">Heartbeat</span>
+        {% if is_admin %}
         <button class="toggle-btn" id="toggle-btn" title="Toggle heartbeat service">
             <span class="toggle-indicator" id="toggle-indicator"></span>
         </button>
-        <span class="toggle-status" id="toggle-status">...</span>
+        {% endif %}
+        <span class="heartbeat-status-badge status-badge" id="heartbeat-badge">...</span>
     </div>
 </div>
 

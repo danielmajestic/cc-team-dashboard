@@ -69,7 +69,10 @@ def create_app(testing=False, db_path_override=None):
 
     @app.route("/")
     def dashboard():
-        return render_template("dashboard.html")
+        admin_key = request.args.get("admin", "")
+        configured_key = app.config.get("DASHBOARD_API_KEY", "")
+        is_admin = bool(configured_key and admin_key == configured_key)
+        return render_template("dashboard.html", is_admin=is_admin)
 
     @app.route("/agents")
     def agents():

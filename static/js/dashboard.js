@@ -305,21 +305,23 @@
         }
     }
 
-    // --- Heartbeat toggle ---
+    // --- Heartbeat status display ---
 
-    function updateToggleUI(active) {
+    function updateHeartbeatUI(active) {
+        var badge = document.getElementById('heartbeat-badge');
         var btn = document.getElementById('toggle-btn');
-        var status = document.getElementById('toggle-status');
-        if (!btn || !status) return;
 
-        if (active) {
-            btn.classList.add('active');
-            status.textContent = 'ON';
-            status.className = 'toggle-status on';
-        } else {
-            btn.classList.remove('active');
-            status.textContent = 'OFF';
-            status.className = 'toggle-status off';
+        if (badge) {
+            badge.textContent = active ? 'ON' : 'OFF';
+            badge.className = 'heartbeat-status-badge status-badge ' + (active ? 'online' : 'offline');
+        }
+
+        if (btn) {
+            if (active) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
         }
     }
 
@@ -331,7 +333,7 @@
             if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText);
-                    updateToggleUI(data.active);
+                    updateHeartbeatUI(data.active);
                 } catch (e) { /* ignore */ }
             }
         };
@@ -339,21 +341,28 @@
     }
 
     function initHeartbeatToggle() {
+        var toggleContainer = document.getElementById('heartbeat-toggle');
         var btn = document.getElementById('toggle-btn');
-        if (!btn) return;
 
         fetchHeartbeatStatus();
+
+        // Only set up click handler if admin mode (toggle button present)
+        if (!btn || !toggleContainer || !toggleContainer.hasAttribute('data-admin-mode')) return;
 
         btn.addEventListener('click', function () {
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/heartbeat/toggle', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
+            // Pass admin key from URL for auth
+            var params = new URLSearchParams(window.location.search);
+            var adminKey = params.get('admin') || '';
+            xhr.setRequestHeader('X-API-Key', adminKey);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState !== 4) return;
                 if (xhr.status === 200) {
                     try {
                         var data = JSON.parse(xhr.responseText);
-                        updateToggleUI(data.active);
+                        updateHeartbeatUI(data.active);
                     } catch (e) { /* ignore */ }
                 }
             };

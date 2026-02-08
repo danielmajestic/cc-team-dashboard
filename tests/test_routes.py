@@ -172,3 +172,27 @@ def test_css_has_rendered_markdown_styles(client):
     assert ".working-md-rendered" in css
     assert ".working-md-rendered h2" in css
     assert ".working-md-rendered strong" in css
+
+
+class TestHeartbeatToggleUI:
+    def test_dashboard_shows_heartbeat_badge_by_default(self, client):
+        """Default dashboard should show heartbeat as read-only badge, no toggle button."""
+        resp = client.get("/")
+        html = resp.data.decode()
+        assert 'id="heartbeat-badge"' in html
+        assert 'id="toggle-btn"' not in html
+
+    def test_dashboard_shows_toggle_with_admin_param(self, client):
+        """Dashboard with correct admin param should include interactive toggle."""
+        resp = client.get("/?admin=test-admin-key")
+        html = resp.data.decode()
+        assert 'data-admin-mode="true"' in html
+        assert 'id="toggle-btn"' in html
+        assert 'id="heartbeat-badge"' in html
+
+    def test_dashboard_no_toggle_with_wrong_admin_param(self, client):
+        """Dashboard with wrong admin param should NOT show toggle."""
+        resp = client.get("/?admin=wrong-key")
+        html = resp.data.decode()
+        assert 'data-admin-mode' not in html
+        assert 'id="toggle-btn"' not in html

@@ -466,19 +466,8 @@ h2 {
     transform: translateX(20px);
 }
 
-.toggle-status {
+.heartbeat-status-badge {
     font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.toggle-status.on {
-    color: var(--status-green);
-}
-
-.toggle-status.off {
-    color: var(--status-red);
 }
 
 /* Activity Feed */
