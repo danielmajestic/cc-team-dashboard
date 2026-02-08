@@ -4,8 +4,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _require_env(key):
+    value = os.environ.get(key)
+    if not value:
+        raise RuntimeError(f"{key} environment variable is required")
+    return value
+
+
 class Config:
-    SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
+    SECRET_KEY = _require_env("FLASK_SECRET_KEY")
     DATABASE_URI = os.environ.get("DATABASE_URI", "sqlite:///dashboard.db")
     DATABASE_PATH = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "instance", "dashboard.db"
@@ -36,4 +43,5 @@ class Config:
 
 class TestConfig(Config):
     TESTING = True
+    SECRET_KEY = "test-secret-key-not-for-production"
     DATABASE_PATH = ":memory:"
