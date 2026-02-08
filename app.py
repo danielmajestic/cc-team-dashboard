@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 from datetime import datetime, timezone
+import bleach
 import markdown
 from flask import Flask, render_template, request, jsonify
 from config import Config, TestConfig
@@ -179,7 +180,17 @@ def create_app(testing=False, db_path_override=None):
         with open(working_path, "r") as f:
             content = f.read()
 
-        content_html = markdown.markdown(content)
+        raw_html = markdown.markdown(content)
+        content_html = bleach.clean(
+            raw_html,
+            tags=["h1", "h2", "h3", "h4", "h5", "h6",
+                  "p", "br", "hr",
+                  "strong", "em", "code", "pre",
+                  "ul", "ol", "li",
+                  "blockquote", "a"],
+            attributes={"a": ["href"]},
+            strip=True,
+        )
 
         return jsonify({
             "agent_name": agent["name"],
@@ -187,8 +198,26 @@ def create_app(testing=False, db_path_override=None):
             "content_html": content_html,
         }), 200
 
+    _ENV_SECRET_RE = re.compile(
+        r'(?<==)(xox[bpars]-\S+|sk-[a-zA-Z0-9_-]+|'
+        r'[0-9a-f]{32,}|'
+        r'postgres://\S+|mysql://\S+)',
+        re.IGNORECASE
+    )
+
+    def sanitize_terminal_output(text):
+        """Redact tokens, hex secrets, and credential URLs from terminal output."""
+        text = _TOKEN_RE.sub('[REDACTED]', text)
+        text = _HEX_SECRET_RE.sub('[REDACTED]', text)
+        text = _ENV_SECRET_RE.sub('[REDACTED]', text)
+        return text
+
     @app.route("/api/agents/<name>/terminal", methods=["GET"])
     def api_agent_terminal(name):
+        auth_err = require_api_key()
+        if auth_err:
+            return auth_err
+
         if not re.fullmatch(r'[A-Za-z0-9_-]+', name):
             return jsonify({"error": "invalid agent name"}), 400
 
@@ -206,7 +235,7 @@ def create_app(testing=False, db_path_override=None):
             return jsonify({"error": "tmux session not found",
                             "detail": result.stderr.strip()}), 404
 
-        return jsonify({"name": name, "output": result.stdout}), 200
+        return jsonify({"name": name, "output": sanitize_terminal_output(result.stdout)}), 200
 
     @app.route("/api/agents", methods=["GET"])
     def api_list_agents():
