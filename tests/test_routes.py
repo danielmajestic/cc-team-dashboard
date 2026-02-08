@@ -27,6 +27,52 @@ def test_issues_route(client):
     assert b"Issues" in response.data
 
 
+def test_issues_page_has_kanban_board(client):
+    response = client.get("/issues")
+    html = response.data.decode()
+    assert 'id="kanban-board"' in html
+
+
+def test_issues_page_has_kanban_columns(client):
+    response = client.get("/issues")
+    html = response.data.decode()
+    assert 'data-column="Inbox"' in html
+    assert 'data-column="Assigned"' in html
+    assert 'data-column="In Progress"' in html
+    assert 'data-column="Review"' in html
+    assert 'data-column="Done"' in html
+
+
+def test_issues_page_has_view_toggle(client):
+    response = client.get("/issues")
+    html = response.data.decode()
+    assert 'id="kanban-view-btn"' in html
+    assert 'id="list-view-btn"' in html
+
+
+def test_issues_page_has_list_view(client):
+    response = client.get("/issues")
+    html = response.data.decode()
+    assert 'id="issues-list"' in html
+    assert 'id="issues-table"' in html
+
+
+def test_issues_page_has_count_badges(client):
+    response = client.get("/issues")
+    html = response.data.decode()
+    assert 'id="count-inbox"' in html
+    assert 'id="count-assigned"' in html
+    assert 'id="count-in-progress"' in html
+    assert 'id="count-review"' in html
+    assert 'id="count-done"' in html
+
+
+def test_nav_has_issues_badge(client):
+    response = client.get("/")
+    html = response.data.decode()
+    assert 'id="issues-badge"' in html
+
+
 def test_nav_links_present_on_dashboard(client):
     response = client.get("/")
     html = response.data.decode()

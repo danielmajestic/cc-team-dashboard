@@ -2,6 +2,9 @@ import json
 import os
 import re
 import subprocess
+import time
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 import markdown
 from flask import Flask, render_template, request, jsonify
@@ -25,14 +28,15 @@ def create_app(testing=False, db_path_override=None):
     # Slack user ID -> display name cache
     _slack_user_cache = {}
 
+    # Issues cache: {"data": [...], "timestamp": float}
+    _issues_cache = {"data": None, "timestamp": 0}
+
     def resolve_slack_user(user_id, token):
         """Resolve a Slack user ID to a display name via users.info API.
 
         Results are cached in _slack_user_cache. Falls back to the raw
         user_id if the lookup fails.
         """
-        import urllib.request
-        import urllib.error
 
         if user_id in _slack_user_cache:
             return _slack_user_cache[user_id]
@@ -228,8 +232,6 @@ def create_app(testing=False, db_path_override=None):
     @app.route("/api/activity", methods=["GET"])
     def api_activity():
         from models import get_all_agents
-        import urllib.request
-        import urllib.error
 
         events = []
 
@@ -316,6 +318,119 @@ def create_app(testing=False, db_path_override=None):
         events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
 
         return jsonify(events[:20]), 200
+
+    # --- GitHub Issues ---
+
+    # Label -> column mapping
+    COLUMN_MAP = {
+        "assigned": "Assigned",
+        "in progress": "In Progress",
+        "in-progress": "In Progress",
+        "wip": "In Progress",
+        "review": "Review",
+        "needs review": "Review",
+        "in review": "Review",
+        "done": "Done",
+        "closed": "Done",
+        "completed": "Done",
+    }
+
+    def _map_column(labels):
+        """Map issue labels to a Kanban column. Default to Inbox."""
+        for label in labels:
+            name = label.get("name", "").lower()
+            if name in COLUMN_MAP:
+                return COLUMN_MAP[name]
+        # Check for assignee-based mapping
+        return None
+
+    def _github_get(url, token):
+        """Make an authenticated GET request to GitHub API."""
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "cc-team-dashboard",
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode())
+
+    def _fetch_issues_from_github():
+        """Fetch open issues from all configured repos."""
+        token = app.config.get("GITHUB_TOKEN", "")
+        if not token:
+            return []
+
+        issues = []
+        repos = app.config.get("GITHUB_REPOS", [])
+
+        # If no repos configured, fetch from user's repos
+        if not repos:
+            try:
+                user_repos = _github_get(
+                    "https://api.github.com/users/danielmajestic/repos"
+                    "?per_page=100&sort=updated",
+                    token,
+                )
+                repos = [r["full_name"] for r in user_repos
+                         if not r.get("fork") and not r.get("archived")]
+            except (urllib.error.URLError, OSError, ValueError, KeyError):
+                return []
+
+        for repo in repos:
+            try:
+                repo_issues = _github_get(
+                    f"https://api.github.com/repos/{repo}/issues"
+                    f"?state=open&per_page=100",
+                    token,
+                )
+                for issue in repo_issues:
+                    # Skip pull requests (GitHub API includes them)
+                    if issue.get("pull_request"):
+                        continue
+
+                    labels = issue.get("labels", [])
+                    column = _map_column(labels)
+                    assignee = issue.get("assignee")
+
+                    # If no label-based column, infer from assignee
+                    if column is None:
+                        if assignee:
+                            column = "Assigned"
+                        else:
+                            column = "Inbox"
+
+                    issues.append({
+                        "id": issue["id"],
+                        "number": issue["number"],
+                        "title": issue["title"],
+                        "state": issue["state"],
+                        "column": column,
+                        "repo": repo,
+                        "url": issue["html_url"],
+                        "assignee": assignee["login"] if assignee else None,
+                        "labels": [l["name"] for l in labels],
+                        "created_at": issue["created_at"],
+                        "updated_at": issue["updated_at"],
+                    })
+            except (urllib.error.URLError, OSError, ValueError, KeyError):
+                continue
+
+        return issues
+
+    @app.route("/api/issues", methods=["GET"])
+    def api_issues():
+        cache_ttl = app.config.get("ISSUE_REFRESH_INTERVAL", 300)
+        now = time.time()
+
+        if (_issues_cache["data"] is not None
+                and now - _issues_cache["timestamp"] < cache_ttl):
+            return jsonify(_issues_cache["data"]), 200
+
+        issues = _fetch_issues_from_github()
+        _issues_cache["data"] = issues
+        _issues_cache["timestamp"] = now
+
+        return jsonify(issues), 200
 
     return app
 

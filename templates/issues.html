@@ -1,6 +1,70 @@
 {% extends "base.html" %}
 {% block title %}Issues — CC Team Dashboard{% endblock %}
 {% block content %}
-<h1>Issues</h1>
-<p>GitHub issues will appear here.</p>
+<div class="issues-header">
+    <h1>Issues</h1>
+    <div class="issues-controls">
+        <button class="view-toggle-btn active" id="kanban-view-btn" data-view="kanban">Kanban</button>
+        <button class="view-toggle-btn" id="list-view-btn" data-view="list">List</button>
+    </div>
+</div>
+
+<div id="kanban-board" class="kanban-board">
+    <div class="kanban-column" data-column="Inbox">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">Inbox</span>
+            <span class="kanban-column-count" id="count-inbox">0</span>
+        </div>
+        <div class="kanban-cards" id="cards-inbox"></div>
+    </div>
+    <div class="kanban-column" data-column="Assigned">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">Assigned</span>
+            <span class="kanban-column-count" id="count-assigned">0</span>
+        </div>
+        <div class="kanban-cards" id="cards-assigned"></div>
+    </div>
+    <div class="kanban-column" data-column="In Progress">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">In Progress</span>
+            <span class="kanban-column-count" id="count-in-progress">0</span>
+        </div>
+        <div class="kanban-cards" id="cards-in-progress"></div>
+    </div>
+    <div class="kanban-column" data-column="Review">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">Review</span>
+            <span class="kanban-column-count" id="count-review">0</span>
+        </div>
+        <div class="kanban-cards" id="cards-review"></div>
+    </div>
+    <div class="kanban-column" data-column="Done">
+        <div class="kanban-column-header">
+            <span class="kanban-column-title">Done</span>
+            <span class="kanban-column-count" id="count-done">0</span>
+        </div>
+        <div class="kanban-cards" id="cards-done"></div>
+    </div>
+</div>
+
+<div id="issues-list" class="issues-list" style="display:none;">
+    <div class="table-wrap">
+        <table class="agent-table" id="issues-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Repo</th>
+                    <th>Column</th>
+                    <th>Assignee</th>
+                    <th>Labels</th>
+                    <th>Updated</th>
+                </tr>
+            </thead>
+            <tbody id="issues-table-body">
+                <tr><td colspan="7" class="loading-msg">Loading issues...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock %}

@@ -12,7 +12,7 @@
         <ul class="nav-links">
             <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Agents</a></li>
-            <li><a href="/issues" class="{% if request.path.startswith('/issues') %}active{% endif %}">Issues</a></li>
+            <li><a href="/issues" class="{% if request.path.startswith('/issues') %}active{% endif %}">Issues<span class="nav-badge" id="issues-badge" style="display:none;"></span></a></li>
         </ul>
     </nav>
     <main class="content">

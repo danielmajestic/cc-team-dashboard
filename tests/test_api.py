@@ -1,5 +1,7 @@
 import io
 import json
+import time
+import urllib.error
 import pytest
 from unittest.mock import patch, MagicMock
 from app import create_app
@@ -382,6 +384,10 @@ class TestHeartbeatToggle:
 
 class TestActivityFeed:
     def test_activity_returns_git_commits(self, app, client):
+        # Disable Slack so real messages don't crowd out mock commits
+        app.config["SLACK_BOT_TOKEN"] = ""
+        app.config["SLACK_CHANNELS"] = []
+
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = (
@@ -389,7 +395,7 @@ class TestActivityFeed:
             "def5678||Kat||Add models||2025-01-15T09:00:00+00:00\n"
         )
 
-        with patch("app.subprocess.run", return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             resp = client.get("/api/activity")
             assert resp.status_code == 200
             data = resp.get_json()
@@ -641,3 +647,208 @@ class TestWorkingHtmlRendering:
         data = resp.get_json()
         assert "<ul>" in data["content_html"]
         assert "<li>" in data["content_html"]
+
+
+# --- GET /api/issues ---
+
+class TestIssuesEndpoint:
+    """Tests for the GitHub Issues API endpoint."""
+
+    def _make_github_response(self, data):
+        """Build a mock urlopen context manager returning JSON data."""
+        resp_bytes = json.dumps(data).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = resp_bytes
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def _sample_issue(self, number=1, title="Test issue", labels=None,
+                      assignee=None, pull_request=None):
+        """Build a sample GitHub issue payload."""
+        issue = {
+            "id": 100 + number,
+            "number": number,
+            "title": title,
+            "state": "open",
+            "html_url": f"https://github.com/owner/repo/issues/{number}",
+            "labels": labels or [],
+            "assignee": {"login": assignee} if assignee else None,
+            "created_at": "2026-02-01T10:00:00Z",
+            "updated_at": "2026-02-08T10:00:00Z",
+        }
+        if pull_request is not None:
+            issue["pull_request"] = pull_request
+        return issue
+
+    def test_issues_returns_empty_without_token(self, app, client):
+        """Should return empty list when GITHUB_TOKEN is not set."""
+        app.config["GITHUB_TOKEN"] = ""
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+        # Reset cache
+        resp = client.get("/api/issues")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data == []
+
+    def test_issues_returns_mapped_issues(self, app, client):
+        """Should return issues with correct column mapping."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(1, "Bug fix", labels=[{"name": "in progress"}]),
+            self._sample_issue(2, "New feature", assignee="alice"),
+            self._sample_issue(3, "Unassigned task"),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert len(data) == 3
+
+            columns = {d["title"]: d["column"] for d in data}
+            assert columns["Bug fix"] == "In Progress"
+            assert columns["New feature"] == "Assigned"
+            assert columns["Unassigned task"] == "Inbox"
+
+    def test_issues_skips_pull_requests(self, app, client):
+        """Should filter out pull requests from results."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(1, "Real issue"),
+            self._sample_issue(2, "A PR", pull_request={"url": "https://..."}),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            assert len(data) == 1
+            assert data[0]["title"] == "Real issue"
+
+    def test_issues_maps_review_labels(self, app, client):
+        """Should map review-related labels to Review column."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(1, "Needs review", labels=[{"name": "review"}]),
+            self._sample_issue(2, "In review", labels=[{"name": "needs review"}]),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            assert all(d["column"] == "Review" for d in data)
+
+    def test_issues_maps_done_labels(self, app, client):
+        """Should map done-related labels to Done column."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(1, "Completed task", labels=[{"name": "done"}]),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            assert data[0]["column"] == "Done"
+
+    def test_issues_includes_labels_list(self, app, client):
+        """Should include label names in response."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(1, "Labeled", labels=[
+                {"name": "bug"}, {"name": "in progress"}
+            ]),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            assert "bug" in data[0]["labels"]
+            assert "in progress" in data[0]["labels"]
+
+    def test_issues_includes_repo_name(self, app, client):
+        """Should include repo full name in response."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/myrepo"]
+
+        issues_data = [self._sample_issue(1, "Test")]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            assert data[0]["repo"] == "owner/myrepo"
+
+    def test_issues_caches_results(self, app, client):
+        """Should cache results and not re-fetch within TTL."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+        app.config["ISSUE_REFRESH_INTERVAL"] = 300
+
+        issues_data = [self._sample_issue(1, "Cached issue")]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_url:
+            # First call - fetches from API
+            resp1 = client.get("/api/issues")
+            assert resp1.status_code == 200
+            call_count_1 = mock_url.call_count
+
+            # Second call - should use cache
+            resp2 = client.get("/api/issues")
+            assert resp2.status_code == 200
+            assert mock_url.call_count == call_count_1  # no new calls
+
+            data = resp2.get_json()
+            assert len(data) == 1
+            assert data[0]["title"] == "Cached issue"
+
+    def test_issues_handles_github_api_error(self, app, client):
+        """Should return empty list on GitHub API failure."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        with patch("urllib.request.urlopen",
+                   side_effect=urllib.error.URLError("network error")):
+            resp = client.get("/api/issues")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data == []
+
+    def test_issues_response_fields(self, app, client):
+        """Should include all expected fields in issue objects."""
+        app.config["GITHUB_TOKEN"] = "test-token"
+        app.config["GITHUB_REPOS"] = ["owner/repo"]
+
+        issues_data = [
+            self._sample_issue(42, "Complete issue", assignee="bob",
+                              labels=[{"name": "in progress"}]),
+        ]
+        mock_resp = self._make_github_response(issues_data)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            resp = client.get("/api/issues")
+            data = resp.get_json()
+            issue = data[0]
+            assert issue["number"] == 42
+            assert issue["title"] == "Complete issue"
+            assert issue["assignee"] == "bob"
+            assert issue["column"] == "In Progress"
+            assert issue["repo"] == "owner/repo"
+            assert "url" in issue
+            assert "created_at" in issue
+            assert "updated_at" in issue

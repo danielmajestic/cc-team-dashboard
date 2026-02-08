@@ -7,7 +7,9 @@
     var REFRESH_INTERVAL = 30000;
     var TERMINAL_REFRESH_INTERVAL = 10000;
     var ACTIVITY_REFRESH_INTERVAL = 15000;
+    var ISSUES_REFRESH_INTERVAL = 300000; // 5 minutes
     var AGENT_API = '/api/agents';
+    var ISSUES_API = '/api/issues';
 
     // Known team role mappings
     var ROLE_MAP = {
@@ -417,12 +419,184 @@
         xhr.send();
     }
 
+    // --- Issues / Kanban ---
+
+    var COLUMN_IDS = {
+        'Inbox': 'cards-inbox',
+        'Assigned': 'cards-assigned',
+        'In Progress': 'cards-in-progress',
+        'Review': 'cards-review',
+        'Done': 'cards-done'
+    };
+
+    var COUNT_IDS = {
+        'Inbox': 'count-inbox',
+        'Assigned': 'count-assigned',
+        'In Progress': 'count-in-progress',
+        'Review': 'count-review',
+        'Done': 'count-done'
+    };
+
+    function repoShort(fullName) {
+        if (!fullName) return '';
+        var parts = fullName.split('/');
+        return parts.length > 1 ? parts[1] : fullName;
+    }
+
+    function renderIssueCard(issue) {
+        var labels = '';
+        if (issue.labels && issue.labels.length > 0) {
+            labels = '<div class="issue-labels">';
+            for (var k = 0; k < issue.labels.length; k++) {
+                labels += '<span class="issue-label">' + escapeHtml(issue.labels[k]) + '</span>';
+            }
+            labels += '</div>';
+        }
+
+        var assigneeHtml = issue.assignee
+            ? '<span class="issue-assignee">' + escapeHtml(issue.assignee) + '</span>'
+            : '';
+
+        return '<div class="issue-card">'
+            + '<div class="issue-card-title">'
+            + '<a href="' + escapeHtml(issue.url) + '" target="_blank" rel="noopener">'
+            + escapeHtml(issue.title)
+            + '</a>'
+            + '</div>'
+            + '<div class="issue-card-meta">'
+            + '<span class="issue-card-number">#' + issue.number + '</span>'
+            + '<span class="repo-badge">' + escapeHtml(repoShort(issue.repo)) + '</span>'
+            + assigneeHtml
+            + '</div>'
+            + labels
+            + '</div>';
+    }
+
+    function renderKanbanBoard(issues) {
+        var board = document.getElementById('kanban-board');
+        if (!board) return;
+
+        // Group issues by column
+        var columns = { 'Inbox': [], 'Assigned': [], 'In Progress': [], 'Review': [], 'Done': [] };
+        for (var i = 0; i < issues.length; i++) {
+            var col = issues[i].column || 'Inbox';
+            if (!columns[col]) col = 'Inbox';
+            columns[col].push(issues[i]);
+        }
+
+        // Render each column
+        for (var colName in COLUMN_IDS) {
+            var container = document.getElementById(COLUMN_IDS[colName]);
+            var countEl = document.getElementById(COUNT_IDS[colName]);
+            if (!container) continue;
+
+            var colIssues = columns[colName] || [];
+            if (countEl) countEl.textContent = colIssues.length;
+
+            if (colIssues.length === 0) {
+                container.innerHTML = '<p class="empty-msg" style="padding:0.5rem;font-size:0.75rem;">No issues</p>';
+                continue;
+            }
+
+            var html = '';
+            for (var j = 0; j < colIssues.length; j++) {
+                html += renderIssueCard(colIssues[j]);
+            }
+            container.innerHTML = html;
+        }
+    }
+
+    function renderIssuesList(issues) {
+        var tbody = document.getElementById('issues-table-body');
+        if (!tbody) return;
+
+        if (!issues || issues.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">No issues found.</td></tr>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < issues.length; i++) {
+            var issue = issues[i];
+            var labelsStr = (issue.labels || []).join(', ');
+            html += '<tr>'
+                + '<td><a href="' + escapeHtml(issue.url) + '" target="_blank" rel="noopener">#' + issue.number + '</a></td>'
+                + '<td>' + escapeHtml(issue.title) + '</td>'
+                + '<td><span class="repo-badge">' + escapeHtml(repoShort(issue.repo)) + '</span></td>'
+                + '<td>' + escapeHtml(issue.column) + '</td>'
+                + '<td>' + escapeHtml(issue.assignee || '—') + '</td>'
+                + '<td>' + escapeHtml(labelsStr || '—') + '</td>'
+                + '<td>' + timeAgo(issue.updated_at) + '</td>'
+                + '</tr>';
+        }
+        tbody.innerHTML = html;
+    }
+
+    function updateIssuesBadge(count) {
+        var badge = document.getElementById('issues-badge');
+        if (!badge) return;
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = '';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    function fetchIssues() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', ISSUES_API, true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            if (xhr.status === 200) {
+                try {
+                    var issues = JSON.parse(xhr.responseText);
+                    renderKanbanBoard(issues);
+                    renderIssuesList(issues);
+                    updateIssuesBadge(issues.length);
+                } catch (e) {
+                    var board = document.getElementById('kanban-board');
+                    if (board) board.innerHTML = '<p class="error-msg">Failed to parse issues data.</p>';
+                }
+            } else {
+                var board = document.getElementById('kanban-board');
+                if (board) board.innerHTML = '<p class="error-msg">Error loading issues (HTTP ' + xhr.status + ').</p>';
+            }
+        };
+        xhr.send();
+    }
+
+    function initViewToggle() {
+        var kanbanBtn = document.getElementById('kanban-view-btn');
+        var listBtn = document.getElementById('list-view-btn');
+        var kanbanBoard = document.getElementById('kanban-board');
+        var issuesList = document.getElementById('issues-list');
+
+        if (!kanbanBtn || !listBtn) return;
+
+        kanbanBtn.addEventListener('click', function () {
+            kanbanBtn.classList.add('active');
+            listBtn.classList.remove('active');
+            if (kanbanBoard) kanbanBoard.style.display = '';
+            if (issuesList) issuesList.style.display = 'none';
+        });
+
+        listBtn.addEventListener('click', function () {
+            listBtn.classList.add('active');
+            kanbanBtn.classList.remove('active');
+            if (kanbanBoard) kanbanBoard.style.display = 'none';
+            if (issuesList) issuesList.style.display = '';
+        });
+    }
+
     // Initialize on DOM ready
     function init() {
         fetchAgents();
         initFilters();
         initHeartbeatToggle();
         fetchActivity();
+        fetchIssues();
+        initViewToggle();
         setInterval(fetchAgents, REFRESH_INTERVAL);
         setInterval(function () {
             if (knownAgentNames.length > 0) {
@@ -430,6 +604,7 @@
             }
         }, TERMINAL_REFRESH_INTERVAL);
         setInterval(fetchActivity, ACTIVITY_REFRESH_INTERVAL);
+        setInterval(fetchIssues, ISSUES_REFRESH_INTERVAL);
     }
 
     if (document.readyState === 'loading') {
