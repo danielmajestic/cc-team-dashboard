@@ -47,3 +47,5 @@ class TestConfig(Config):
     SECRET_KEY = "test-secret-key-not-for-production"
     DATABASE_PATH = ":memory:"
     DASHBOARD_API_KEY = "test-admin-key"
+    SLACK_BOT_TOKEN = ""
+    SLACK_CHANNELS = []
