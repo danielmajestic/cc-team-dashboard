@@ -9,8 +9,10 @@
         <button class="toggle-btn" id="toggle-btn" title="Toggle heartbeat service">
             <span class="toggle-indicator" id="toggle-indicator"></span>
         </button>
+        {% else %}
+        <span class="hb-lock" title="Admin access required to toggle">&#x1F512;</span>
         {% endif %}
-        <span class="heartbeat-status-badge status-badge" id="heartbeat-badge">...</span>
+        <span class="heartbeat-status-badge" id="heartbeat-badge">...</span>
     </div>
 </div>
 

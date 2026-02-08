@@ -313,7 +313,7 @@
 
         if (badge) {
             badge.textContent = active ? 'ON' : 'OFF';
-            badge.className = 'heartbeat-status-badge status-badge ' + (active ? 'online' : 'offline');
+            badge.className = 'heartbeat-status-badge ' + (active ? 'hb-on' : 'hb-off');
         }
 
         if (btn) {
