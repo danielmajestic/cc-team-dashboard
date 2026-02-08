@@ -683,6 +683,70 @@ class TestSlackUserResolution:
                 slack_events = [e for e in data if e["type"] == "slack"]
                 assert slack_events[0]["agent"] == "U0EEE"
 
+    def test_bot_message_uses_bot_profile_name(self, app, client):
+        """Bot messages should show bot_profile.name when users.info fails."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {
+                "user": "U0AAA5ZK6EB",
+                "text": "hello from bot",
+                "ts": "1705312800.000",
+                "bot_id": "B0AAN6PNC5T",
+                "bot_profile": {
+                    "name": "CC-Bridge",
+                    "id": "B0AAN6PNC5T",
+                },
+            }
+        ])
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                import urllib.error
+                raise urllib.error.URLError("missing_scope")
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert len(slack_events) == 1
+                assert slack_events[0]["agent"] == "CC-Bridge"
+
+    def test_bot_message_without_bot_profile_falls_back_to_id(self, app, client):
+        """Bot messages without bot_profile should fall back to raw user ID."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {
+                "user": "U0FFF",
+                "text": "orphan bot msg",
+                "ts": "1705312800.000",
+            }
+        ])
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                import urllib.error
+                raise urllib.error.URLError("missing_scope")
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert slack_events[0]["agent"] == "U0FFF"
+
 
 # --- WORKING.md HTML rendering ---
 

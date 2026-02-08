@@ -25,11 +25,11 @@ def create_app(testing=False, db_path_override=None):
     # Slack user ID -> display name cache
     _slack_user_cache = {}
 
-    def resolve_slack_user(user_id, token):
+    def resolve_slack_user(user_id, token, fallback_name=""):
         """Resolve a Slack user ID to a display name via users.info API.
 
-        Results are cached in _slack_user_cache. Falls back to the raw
-        user_id if the lookup fails.
+        Results are cached in _slack_user_cache. Falls back to
+        fallback_name (e.g. bot_profile.name) or the raw user_id.
         """
         import urllib.request
         import urllib.error
@@ -55,8 +55,9 @@ def create_app(testing=False, db_path_override=None):
         except (urllib.error.URLError, OSError, ValueError, KeyError):
             pass
 
-        _slack_user_cache[user_id] = user_id
-        return user_id
+        resolved = fallback_name or user_id
+        _slack_user_cache[user_id] = resolved
+        return resolved
 
     from models import init_db, get_db_connection
 
@@ -309,8 +310,9 @@ def create_app(testing=False, db_path_override=None):
                             except (ValueError, OSError):
                                 dt = ""
                             raw_user = msg.get("user", "unknown")
+                            bot_name = (msg.get("bot_profile") or {}).get("name", "")
                             display_name = resolve_slack_user(
-                                raw_user, token
+                                raw_user, token, fallback_name=bot_name
                             ) if raw_user != "unknown" else "unknown"
                             events.append({
                                 "type": "slack",
