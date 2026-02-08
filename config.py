@@ -45,3 +45,5 @@ class TestConfig(Config):
     TESTING = True
     SECRET_KEY = "test-secret-key-not-for-production"
     DATABASE_PATH = ":memory:"
+    SLACK_BOT_TOKEN = ""
+    SLACK_CHANNELS = []
