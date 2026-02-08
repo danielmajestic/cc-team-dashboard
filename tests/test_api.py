@@ -597,6 +597,49 @@ class TestSlackUserResolution:
                 user_info_calls = [u for u in urlopen_calls if "users.info" in u]
                 assert len(user_info_calls) == 1
 
+    def test_no_resolution_without_token(self, app, client):
+        """When SLACK_BOT_TOKEN is empty, user IDs should pass through as-is."""
+        app.config["SLACK_BOT_TOKEN"] = ""
+        app.config["SLACK_CHANNELS"] = []
+
+        # Without token, no Slack events are fetched at all
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            resp = client.get("/api/activity")
+            data = resp.get_json()
+            slack_events = [e for e in data if e["type"] == "slack"]
+            assert len(slack_events) == 0
+
+    def test_handles_api_ok_false(self, app, client):
+        """Should fall back to raw ID when Slack API returns ok=false."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0EEE", "text": "test", "ts": "1705312800.000"}
+        ])
+
+        error_resp_data = json.dumps({"ok": False, "error": "user_not_found"}).encode()
+        error_resp = MagicMock()
+        error_resp.read.return_value = error_resp_data
+        error_resp.__enter__ = lambda s: s
+        error_resp.__exit__ = MagicMock(return_value=False)
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                return error_resp
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert slack_events[0]["agent"] == "U0EEE"
+
 
 # --- WORKING.md HTML rendering ---
 
