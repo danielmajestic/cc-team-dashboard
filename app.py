@@ -207,6 +207,12 @@ def create_app(testing=False, db_path_override=None):
 
     @app.route("/api/heartbeat/toggle", methods=["POST"])
     def api_heartbeat_toggle():
+        api_key = app.config.get("DASHBOARD_API_KEY", "")
+        if api_key:
+            provided = request.headers.get("X-API-Key", "")
+            if provided != api_key:
+                return jsonify({"error": "forbidden"}), 403
+
         hb_file = app.config.get(
             "HEARTBEAT_FILE",
             os.path.expanduser("~/agents/shared/.heartbeat-active")

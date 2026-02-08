@@ -350,7 +350,8 @@ class TestHeartbeatToggle:
         hb_file.write_text("on\n")
         app.config["HEARTBEAT_FILE"] = str(hb_file)
 
-        resp = client.post("/api/heartbeat/toggle")
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["active"] is False
@@ -361,7 +362,8 @@ class TestHeartbeatToggle:
         hb_file.write_text("off\n")
         app.config["HEARTBEAT_FILE"] = str(hb_file)
 
-        resp = client.post("/api/heartbeat/toggle")
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["active"] is True
@@ -371,11 +373,58 @@ class TestHeartbeatToggle:
         hb_file = tmp_path / ".heartbeat-active"
         app.config["HEARTBEAT_FILE"] = str(hb_file)
 
-        resp = client.post("/api/heartbeat/toggle")
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["active"] is True
         assert hb_file.read_text().strip() == "on"
+
+
+class TestHeartbeatToggleAuth:
+    def test_toggle_requires_api_key(self, app, client, tmp_path):
+        """Toggle should reject requests without valid API key."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+        app.config["DASHBOARD_API_KEY"] = "secret-key"
+
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 403
+
+    def test_toggle_accepts_valid_api_key_header(self, app, client, tmp_path):
+        """Toggle should work with valid X-API-Key header."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+        app.config["DASHBOARD_API_KEY"] = "secret-key"
+
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "secret-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is True
+
+    def test_toggle_rejects_wrong_api_key(self, app, client, tmp_path):
+        """Toggle should reject incorrect API key."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+        app.config["DASHBOARD_API_KEY"] = "secret-key"
+
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "wrong-key"})
+        assert resp.status_code == 403
+
+    def test_toggle_works_without_key_configured(self, app, client, tmp_path):
+        """When no DASHBOARD_API_KEY is set, toggle should work without auth."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+        app.config["DASHBOARD_API_KEY"] = ""
+
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 200
 
 
 # --- GET /api/activity ---
