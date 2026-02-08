@@ -39,9 +39,13 @@ class Config:
         "PROJECT_DIR",
         os.path.expanduser("~/projects/cc-team-dashboard")
     )
+    DASHBOARD_API_KEY = os.environ.get("DASHBOARD_API_KEY", "")
 
 
 class TestConfig(Config):
     TESTING = True
     SECRET_KEY = "test-secret-key-not-for-production"
     DATABASE_PATH = ":memory:"
+    DASHBOARD_API_KEY = ""
+    SLACK_BOT_TOKEN = ""
+    SLACK_CHANNELS = []

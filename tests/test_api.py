@@ -19,6 +19,14 @@ def client(app):
     return app.test_client()
 
 
+@pytest.fixture
+def authed_client(app):
+    """Test client that sends the API key header on every request."""
+    client = app.test_client()
+    client.environ_base = {"HTTP_X_API_KEY": "test-api-key"}
+    return client
+
+
 # --- POST /api/agents/register ---
 
 class TestRegisterAgent:
@@ -641,3 +649,140 @@ class TestWorkingHtmlRendering:
         data = resp.get_json()
         assert "<ul>" in data["content_html"]
         assert "<li>" in data["content_html"]
+
+
+# --- API key authentication for write endpoints ---
+
+class TestApiKeyAuth:
+    """Write endpoints should require X-API-Key header when DASHBOARD_API_KEY is set."""
+
+    def test_register_rejected_without_api_key(self, app, client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        resp = client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+        assert resp.status_code == 401
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_register_rejected_with_wrong_api_key(self, app, client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        resp = client.post("/api/agents/register",
+                           json={"name": "kat", "role": "backend"},
+                           headers={"X-API-Key": "wrong-key"})
+        assert resp.status_code == 401
+
+    def test_register_accepted_with_correct_api_key(self, app, authed_client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        resp = authed_client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+        assert resp.status_code == 201
+
+    def test_heartbeat_rejected_without_api_key(self, app, authed_client, client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        # Register with auth
+        resp = authed_client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+        agent_id = resp.get_json()["id"]
+        # Heartbeat without auth
+        resp = client.post(f"/api/agents/{agent_id}/heartbeat")
+        assert resp.status_code == 401
+
+    def test_heartbeat_accepted_with_api_key(self, app, authed_client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        resp = authed_client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+        agent_id = resp.get_json()["id"]
+        resp = authed_client.post(f"/api/agents/{agent_id}/heartbeat")
+        assert resp.status_code == 200
+
+    def test_toggle_rejected_without_api_key(self, app, client):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        resp = client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 401
+
+    def test_toggle_accepted_with_api_key(self, app, authed_client, tmp_path):
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+        resp = authed_client.post("/api/heartbeat/toggle")
+        assert resp.status_code == 200
+
+    def test_read_endpoints_open_without_api_key(self, app, client):
+        """GET endpoints should remain public even when API key is configured."""
+        app.config["DASHBOARD_API_KEY"] = "test-api-key"
+        # GET /api/agents should work without auth
+        resp = client.get("/api/agents")
+        assert resp.status_code == 200
+
+    def test_no_auth_required_when_key_not_set(self, app, client):
+        """When DASHBOARD_API_KEY is empty, write endpoints should be open."""
+        app.config["DASHBOARD_API_KEY"] = ""
+        resp = client.post("/api/agents/register", json={
+            "name": "kat", "role": "backend", "status": "online"
+        })
+        assert resp.status_code == 201
+
+
+# --- Slack message sanitization ---
+
+class TestSlackMessageSanitization:
+    """Slack messages in activity feed should have tokens/secrets stripped."""
+
+    def _make_slack_response(self, messages):
+        slack_resp = json.dumps({
+            "ok": True,
+            "messages": messages,
+        }).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = slack_resp
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def test_slack_token_stripped_from_messages(self, app, client):
+        """Messages containing xoxb/xoxp tokens should have them redacted."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "unknown", "text": "token is xoxb-1234-5678-abcdef", "ts": "1705312800.000"}
+        ])
+
+        def urlopen_side_effect(req, **kwargs):
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert len(slack_events) == 1
+                assert "xoxb-" not in slack_events[0]["message"]
+
+    def test_long_hex_strings_redacted(self, app, client):
+        """Long hex strings that could be secrets should be redacted."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C123"]
+
+        slack_history = self._make_slack_response([
+            {"user": "unknown", "text": "key=0042a64ff953023b828368655b6f503733a25b9296e3d4f1", "ts": "1705312800.000"}
+        ])
+
+        def urlopen_side_effect(req, **kwargs):
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert "0042a64ff953023b" not in slack_events[0]["message"]

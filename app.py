@@ -22,6 +22,29 @@ def create_app(testing=False, db_path_override=None):
     # Ensure instance folder exists
     os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
 
+    def require_api_key():
+        """Check X-API-Key header against DASHBOARD_API_KEY config.
+
+        Returns None if auth passes, or a 401 JSON response if it fails.
+        Skips check when DASHBOARD_API_KEY is not configured.
+        """
+        key = app.config.get("DASHBOARD_API_KEY", "")
+        if not key:
+            return None
+        provided = request.headers.get("X-API-Key", "")
+        if provided != key:
+            return jsonify({"error": "invalid or missing API key"}), 401
+        return None
+
+    _TOKEN_RE = re.compile(r'xox[bpars]-\S+', re.IGNORECASE)
+    _HEX_SECRET_RE = re.compile(r'[0-9a-f]{32,}', re.IGNORECASE)
+
+    def sanitize_slack_text(text):
+        """Strip potential tokens and long hex secrets from Slack message text."""
+        text = _TOKEN_RE.sub('[REDACTED]', text)
+        text = _HEX_SECRET_RE.sub('[REDACTED]', text)
+        return text
+
     # Slack user ID -> display name cache
     _slack_user_cache = {}
 
@@ -83,6 +106,10 @@ def create_app(testing=False, db_path_override=None):
 
     @app.route("/api/agents/register", methods=["POST"])
     def api_register_agent():
+        auth_err = require_api_key()
+        if auth_err:
+            return auth_err
+
         from models import create_agent
 
         data = request.get_json(silent=True) or {}
@@ -107,6 +134,10 @@ def create_app(testing=False, db_path_override=None):
 
     @app.route("/api/agents/<int:agent_id>/heartbeat", methods=["POST"])
     def api_heartbeat(agent_id):
+        auth_err = require_api_key()
+        if auth_err:
+            return auth_err
+
         from models import update_heartbeat
 
         data = request.get_json(silent=True) or {}
@@ -207,6 +238,10 @@ def create_app(testing=False, db_path_override=None):
 
     @app.route("/api/heartbeat/toggle", methods=["POST"])
     def api_heartbeat_toggle():
+        auth_err = require_api_key()
+        if auth_err:
+            return auth_err
+
         hb_file = app.config.get(
             "HEARTBEAT_FILE",
             os.path.expanduser("~/agents/shared/.heartbeat-active")
@@ -307,7 +342,9 @@ def create_app(testing=False, db_path_override=None):
                                 "type": "slack",
                                 "timestamp": dt,
                                 "agent": display_name,
-                                "message": (msg.get("text", "")[:200])
+                                "message": sanitize_slack_text(
+                                    msg.get("text", "")[:200]
+                                ),
                             })
                 except (urllib.error.URLError, OSError, ValueError):
                     pass

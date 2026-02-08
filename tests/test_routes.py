@@ -172,3 +172,29 @@ def test_css_has_rendered_markdown_styles(client):
     assert ".working-md-rendered" in css
     assert ".working-md-rendered h2" in css
     assert ".working-md-rendered strong" in css
+
+
+# --- Public deployment branding ---
+
+
+def test_nav_brand_shows_danknows(client):
+    """Nav brand should say DanKnows Team Dashboard."""
+    response = client.get("/")
+    html = response.data.decode()
+    assert "DanKnows Team Dashboard" in html
+
+
+def test_footer_present(client):
+    """Footer should include site domain and studio name."""
+    response = client.get("/")
+    html = response.data.decode()
+    assert "site-footer" in html
+    assert "dashboard.danknows.org" in html
+    assert "ProfitAppsStudio" in html
+
+
+def test_css_has_footer_styles(client):
+    """style.css should include footer styles."""
+    response = client.get("/static/css/style.css")
+    css = response.data.decode()
+    assert ".site-footer" in css

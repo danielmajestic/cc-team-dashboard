@@ -8,7 +8,7 @@
 </head>
 <body>
     <nav class="main-nav">
-        <div class="nav-brand">CC Team Dashboard</div>
+        <div class="nav-brand">DanKnows Team Dashboard</div>
         <ul class="nav-links">
             <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a></li>
             <li><a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Agents</a></li>
@@ -18,6 +18,11 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
+    <footer class="site-footer">
+        <span>dashboard.danknows.org</span>
+        <span class="footer-sep">&middot;</span>
+        <span>ProfitAppsStudio</span>
+    </footer>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>
