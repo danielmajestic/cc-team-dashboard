@@ -748,6 +748,122 @@ class TestSlackUserResolution:
                 assert slack_events[0]["agent"] == "U0FFF"
 
 
+# --- CC-Bridge display name inference ---
+
+class TestCCBridgeDisplayName:
+    """CC-Bridge bot messages should show team member names based on channel/text."""
+
+    def _make_slack_response(self, messages):
+        slack_resp = json.dumps({"ok": True, "messages": messages}).encode()
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = slack_resp
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def _get_slack_events(self, app, client, channel_id, messages):
+        """Helper: fetch activity with a CC-Bridge bot message in a given channel."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = [channel_id]
+
+        slack_history = self._make_slack_response(messages)
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                import urllib.error
+                raise urllib.error.URLError("missing_scope")
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                return [e for e in data if e["type"] == "slack"]
+
+    def _bot_msg(self, text):
+        return {
+            "user": "U0AAA5ZK6EB", "text": text, "ts": "1705312800.000",
+            "bot_id": "B0AAN6PNC5T",
+            "bot_profile": {"name": "CC-Bridge", "id": "B0AAN6PNC5T"},
+        }
+
+    def test_bot_in_mat_pm_shows_mat(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0ACEGVT7CL", [self._bot_msg("task update")]
+        )
+        assert events[0]["agent"] == "Mat"
+
+    def test_bot_in_kat_dev_shows_kat(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0AC7G548CV", [self._bot_msg("backend ready")]
+        )
+        assert events[0]["agent"] == "Kat"
+
+    def test_bot_in_sam_dev_shows_sam(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0ABVFJPM9D", [self._bot_msg("frontend done")]
+        )
+        assert events[0]["agent"] == "Sam"
+
+    def test_bot_with_dan_signature_shows_dan(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0AC7G6S03F",
+            [self._bot_msg("Looks good! — Dan (via Claude.ai)")]
+        )
+        assert events[0]["agent"] == "Dan"
+
+    def test_bot_with_name_in_text_shows_name(self, app, client):
+        """CC-Bridge in unmapped channel with a name in text uses that name."""
+        events = self._get_slack_events(
+            app, client, "C999UNKNOWN",
+            [self._bot_msg("Mat says the sprint is on track")]
+        )
+        assert events[0]["agent"] == "Mat"
+
+    def test_bot_unknown_channel_no_match_shows_cc_bridge(self, app, client):
+        """CC-Bridge in unmapped channel with no name match stays CC-Bridge."""
+        events = self._get_slack_events(
+            app, client, "C999UNKNOWN",
+            [self._bot_msg("system health check passed")]
+        )
+        assert events[0]["agent"] == "CC-Bridge"
+
+    def test_non_bot_user_unaffected(self, app, client):
+        """Real user messages should not be altered by inference."""
+        app.config["SLACK_BOT_TOKEN"] = "xoxb-test"
+        app.config["SLACK_CHANNELS"] = ["C0ACEGVT7CL"]
+
+        slack_history = self._make_slack_response([
+            {"user": "U0REALUSER", "text": "hello", "ts": "1705312800.000"}
+        ])
+        user_info_data = json.dumps({
+            "ok": True,
+            "user": {"real_name": "Alice", "profile": {"display_name": "Alice"}},
+        }).encode()
+        user_info = MagicMock()
+        user_info.read.return_value = user_info_data
+        user_info.__enter__ = lambda s: s
+        user_info.__exit__ = MagicMock(return_value=False)
+
+        def urlopen_side_effect(req, **kwargs):
+            url = req.full_url if hasattr(req, 'full_url') else req.get_full_url()
+            if "users.info" in url:
+                return user_info
+            return slack_history
+
+        with patch("app.subprocess.run",
+                   return_value=MagicMock(returncode=1, stdout="")):
+            with patch("urllib.request.urlopen",
+                       side_effect=urlopen_side_effect):
+                resp = client.get("/api/activity")
+                data = resp.get_json()
+                slack_events = [e for e in data if e["type"] == "slack"]
+                assert slack_events[0]["agent"] == "Alice"
+
+
 # --- WORKING.md HTML rendering ---
 
 class TestWorkingHtmlRendering:

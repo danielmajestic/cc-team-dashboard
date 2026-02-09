@@ -59,6 +59,37 @@ def create_app(testing=False, db_path_override=None):
         _slack_user_cache[user_id] = resolved
         return resolved
 
+    # Channel ID -> team member name for CC-Bridge relay messages
+    _channel_agent_map = {
+        "C0ACEGVT7CL": "Mat",   # #mat-pm
+        "C0AC7G548CV": "Kat",   # #kat-dev
+        "C0ABVFJPM9D": "Sam",   # #sam-dev
+    }
+
+    def _infer_agent_name(display_name, channel_id, text):
+        """Infer team member name from CC-Bridge relay messages.
+
+        Uses channel ID mapping and message text signatures to determine
+        the actual sender. Returns display_name unchanged for non-bot messages.
+        """
+        if display_name != "CC-Bridge":
+            return display_name
+
+        # Check for Dan's signature in text first (works across any channel)
+        if "Dan (via Claude.ai)" in text:
+            return "Dan"
+
+        # Direct channel mapping
+        if channel_id in _channel_agent_map:
+            return _channel_agent_map[channel_id]
+
+        # Text-based fallback for unmapped channels (e.g. #dan-review)
+        for name in ("Mat", "Kat", "Sam", "Dan"):
+            if name in text:
+                return name
+
+        return "CC-Bridge"
+
     from models import init_db, get_db_connection
 
     # Initialize database
@@ -314,11 +345,15 @@ def create_app(testing=False, db_path_override=None):
                             display_name = resolve_slack_user(
                                 raw_user, token, fallback_name=bot_name
                             ) if raw_user != "unknown" else "unknown"
+                            msg_text = msg.get("text", "")
+                            agent_name = _infer_agent_name(
+                                display_name, channel_id, msg_text
+                            )
                             events.append({
                                 "type": "slack",
                                 "timestamp": dt,
-                                "agent": display_name,
-                                "message": (msg.get("text", "")[:200])
+                                "agent": agent_name,
+                                "message": msg_text[:200],
                             })
                 except (urllib.error.URLError, OSError, ValueError):
                     pass
