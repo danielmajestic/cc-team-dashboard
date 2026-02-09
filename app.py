@@ -32,10 +32,11 @@ def create_app(testing=False, db_path_override=None):
     _issues_cache = {"data": None, "timestamp": 0}
 
     def resolve_slack_user(user_id, token):
+    def resolve_slack_user(user_id, token, fallback_name=""):
         """Resolve a Slack user ID to a display name via users.info API.
 
-        Results are cached in _slack_user_cache. Falls back to the raw
-        user_id if the lookup fails.
+        Results are cached in _slack_user_cache. Falls back to
+        fallback_name (e.g. bot_profile.name) or the raw user_id.
         """
 
         if user_id in _slack_user_cache:
@@ -59,8 +60,49 @@ def create_app(testing=False, db_path_override=None):
         except (urllib.error.URLError, OSError, ValueError, KeyError):
             pass
 
-        _slack_user_cache[user_id] = user_id
-        return user_id
+        resolved = fallback_name or user_id
+        _slack_user_cache[user_id] = resolved
+        return resolved
+
+    # Channel ID -> team member name for CC-Bridge relay messages
+    _channel_agent_map = {
+        "C0ACEGVT7CL": "Mat",   # #mat-pm
+        "C0AC7G548CV": "Kat",   # #kat-dev
+        "C0ABVFJPM9D": "Sam",   # #sam-dev
+    }
+
+    # Patterns that identify the sender in message text (checked in order)
+    _agent_signature_re = re.compile(
+        r"(?:^|\W)"                       # start of string or non-word char
+        r"(Mat|Kat|Sam|Dan)"              # agent name
+        r"(?:"
+        r"\s+here\b"                      # "Sam here"
+        r"|:"                             # "Kat:"
+        r"|\s*\u2014"                     # "Sam —" (em dash)
+        r"|\s*--"                         # "Sam --"
+        r"|\s+\(via\s+Claude\.ai\)"       # "Dan (via Claude.ai)"
+        r")"
+    )
+
+    def _infer_agent_name(display_name, channel_id, text):
+        """Infer team member name from CC-Bridge relay messages.
+
+        Priority: 1) text signatures, 2) channel mapping, 3) CC-Bridge.
+        Returns display_name unchanged for non-bot messages.
+        """
+        if display_name != "CC-Bridge":
+            return display_name
+
+        # 1. Text signatures win — the message tells us who sent it
+        m = _agent_signature_re.search(text)
+        if m:
+            return m.group(1)
+
+        # 2. Channel-based fallback
+        if channel_id in _channel_agent_map:
+            return _channel_agent_map[channel_id]
+
+        return "CC-Bridge"
 
     from models import init_db, get_db_connection
 
@@ -311,14 +353,19 @@ def create_app(testing=False, db_path_override=None):
                             except (ValueError, OSError):
                                 dt = ""
                             raw_user = msg.get("user", "unknown")
+                            bot_name = (msg.get("bot_profile") or {}).get("name", "")
                             display_name = resolve_slack_user(
-                                raw_user, token
+                                raw_user, token, fallback_name=bot_name
                             ) if raw_user != "unknown" else "unknown"
+                            msg_text = msg.get("text", "")
+                            agent_name = _infer_agent_name(
+                                display_name, channel_id, msg_text
+                            )
                             events.append({
                                 "type": "slack",
                                 "timestamp": dt,
-                                "agent": display_name,
-                                "message": (msg.get("text", "")[:200])
+                                "agent": agent_name,
+                                "message": msg_text[:200],
                             })
                 except (urllib.error.URLError, OSError, ValueError):
                     pass

@@ -7,10 +7,15 @@
         <span class="heartbeat-label">Heartbeat</span>
         {% if is_admin %}
         <button class="toggle-btn" id="toggle-btn" title="Toggle heartbeat service">
-            <span class="toggle-indicator" id="toggle-indicator"></span>
+            <span class="toggle-indicator"></span>
         </button>
+        {% else %}
+        <span class="toggle-btn toggle-frozen" id="toggle-display" title="Admin access required to toggle">
+            <span class="toggle-indicator"></span>
+        </span>
         {% endif %}
-        <span class="heartbeat-status-badge status-badge" id="heartbeat-badge">...</span>
+        <span class="heartbeat-status-badge" id="heartbeat-badge">...</span>
+        {% if not is_admin %}<span class="hb-lock">&#x1F512;</span>{% endif %}
     </div>
 </div>
 

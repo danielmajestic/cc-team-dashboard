@@ -467,7 +467,34 @@ h2 {
 }
 
 .heartbeat-status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.7rem;
+    border-radius: 12px;
     font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.heartbeat-status-badge.hb-on {
+    background-color: var(--status-green);
+    color: #fff;
+}
+
+.heartbeat-status-badge.hb-off {
+    background-color: var(--status-red);
+    color: #fff;
+}
+
+.toggle-frozen {
+    pointer-events: none;
+    cursor: default;
+}
+
+.hb-lock {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    cursor: default;
 }
 
 /* Activity Feed */

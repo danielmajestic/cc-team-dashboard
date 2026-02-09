@@ -311,11 +311,11 @@
 
     function updateHeartbeatUI(active) {
         var badge = document.getElementById('heartbeat-badge');
-        var btn = document.getElementById('toggle-btn');
+        var btn = document.getElementById('toggle-btn') || document.getElementById('toggle-display');
 
         if (badge) {
             badge.textContent = active ? 'ON' : 'OFF';
-            badge.className = 'heartbeat-status-badge status-badge ' + (active ? 'online' : 'offline');
+            badge.className = 'heartbeat-status-badge ' + (active ? 'hb-on' : 'hb-off');
         }
 
         if (btn) {
