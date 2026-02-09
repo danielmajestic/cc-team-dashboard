@@ -309,7 +309,7 @@
 
     function updateHeartbeatUI(active) {
         var badge = document.getElementById('heartbeat-badge');
-        var btn = document.getElementById('toggle-btn');
+        var btn = document.getElementById('toggle-btn') || document.getElementById('toggle-display');
 
         if (badge) {
             badge.textContent = active ? 'ON' : 'OFF';

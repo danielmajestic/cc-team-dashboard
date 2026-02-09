@@ -486,6 +486,11 @@ h2 {
     color: #fff;
 }
 
+.toggle-frozen {
+    pointer-events: none;
+    cursor: default;
+}
+
 .hb-lock {
     font-size: 0.8rem;
     opacity: 0.6;
