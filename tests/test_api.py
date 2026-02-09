@@ -790,41 +790,70 @@ class TestCCBridgeDisplayName:
             "bot_profile": {"name": "CC-Bridge", "id": "B0AAN6PNC5T"},
         }
 
-    def test_bot_in_mat_pm_shows_mat(self, app, client):
-        events = self._get_slack_events(
-            app, client, "C0ACEGVT7CL", [self._bot_msg("task update")]
-        )
-        assert events[0]["agent"] == "Mat"
+    # --- Text signatures win over channel ---
 
-    def test_bot_in_kat_dev_shows_kat(self, app, client):
+    def test_sam_signature_in_mat_pm_shows_sam(self, app, client):
+        """Sam posting in #mat-pm should show Sam, not Mat."""
         events = self._get_slack_events(
-            app, client, "C0AC7G548CV", [self._bot_msg("backend ready")]
-        )
-        assert events[0]["agent"] == "Kat"
-
-    def test_bot_in_sam_dev_shows_sam(self, app, client):
-        events = self._get_slack_events(
-            app, client, "C0ABVFJPM9D", [self._bot_msg("frontend done")]
+            app, client, "C0ACEGVT7CL",
+            [self._bot_msg("Sam here — frontend tests all green")]
         )
         assert events[0]["agent"] == "Sam"
 
-    def test_bot_with_dan_signature_shows_dan(self, app, client):
+    def test_kat_signature_in_sam_dev_shows_kat(self, app, client):
+        """Kat posting in #sam-dev should show Kat, not Sam."""
+        events = self._get_slack_events(
+            app, client, "C0ABVFJPM9D",
+            [self._bot_msg("Kat: API endpoint is ready for you")]
+        )
+        assert events[0]["agent"] == "Kat"
+
+    def test_dan_via_claude_signature_shows_dan(self, app, client):
         events = self._get_slack_events(
             app, client, "C0AC7G6S03F",
             [self._bot_msg("Looks good! — Dan (via Claude.ai)")]
         )
         assert events[0]["agent"] == "Dan"
 
-    def test_bot_with_name_in_text_shows_name(self, app, client):
-        """CC-Bridge in unmapped channel with a name in text uses that name."""
+    def test_mat_emdash_signature_shows_mat(self, app, client):
         events = self._get_slack_events(
             app, client, "C999UNKNOWN",
-            [self._bot_msg("Mat says the sprint is on track")]
+            [self._bot_msg("Sprint planning tomorrow — Mat \u2014 let me know")]
         )
         assert events[0]["agent"] == "Mat"
 
-    def test_bot_unknown_channel_no_match_shows_cc_bridge(self, app, client):
-        """CC-Bridge in unmapped channel with no name match stays CC-Bridge."""
+    def test_sam_here_signature_shows_sam(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0AC7G548CV",
+            [self._bot_msg("Sam here, I need the new schema")]
+        )
+        assert events[0]["agent"] == "Sam"
+
+    # --- Channel fallback when no signature ---
+
+    def test_no_signature_in_mat_pm_falls_back_to_mat(self, app, client):
+        """No signature in #mat-pm should fall back to Mat."""
+        events = self._get_slack_events(
+            app, client, "C0ACEGVT7CL", [self._bot_msg("task update")]
+        )
+        assert events[0]["agent"] == "Mat"
+
+    def test_no_signature_in_kat_dev_falls_back_to_kat(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0AC7G548CV", [self._bot_msg("backend ready")]
+        )
+        assert events[0]["agent"] == "Kat"
+
+    def test_no_signature_in_sam_dev_falls_back_to_sam(self, app, client):
+        events = self._get_slack_events(
+            app, client, "C0ABVFJPM9D", [self._bot_msg("frontend done")]
+        )
+        assert events[0]["agent"] == "Sam"
+
+    # --- Fallback to CC-Bridge ---
+
+    def test_bot_unknown_channel_no_signature_shows_cc_bridge(self, app, client):
+        """CC-Bridge in unmapped channel with no signature stays CC-Bridge."""
         events = self._get_slack_events(
             app, client, "C999UNKNOWN",
             [self._bot_msg("system health check passed")]

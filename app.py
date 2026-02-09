@@ -66,27 +66,36 @@ def create_app(testing=False, db_path_override=None):
         "C0ABVFJPM9D": "Sam",   # #sam-dev
     }
 
+    # Patterns that identify the sender in message text (checked in order)
+    _agent_signature_re = re.compile(
+        r"(?:^|\W)"                       # start of string or non-word char
+        r"(Mat|Kat|Sam|Dan)"              # agent name
+        r"(?:"
+        r"\s+here\b"                      # "Sam here"
+        r"|:"                             # "Kat:"
+        r"|\s*\u2014"                     # "Sam —" (em dash)
+        r"|\s*--"                         # "Sam --"
+        r"|\s+\(via\s+Claude\.ai\)"       # "Dan (via Claude.ai)"
+        r")"
+    )
+
     def _infer_agent_name(display_name, channel_id, text):
         """Infer team member name from CC-Bridge relay messages.
 
-        Uses channel ID mapping and message text signatures to determine
-        the actual sender. Returns display_name unchanged for non-bot messages.
+        Priority: 1) text signatures, 2) channel mapping, 3) CC-Bridge.
+        Returns display_name unchanged for non-bot messages.
         """
         if display_name != "CC-Bridge":
             return display_name
 
-        # Check for Dan's signature in text first (works across any channel)
-        if "Dan (via Claude.ai)" in text:
-            return "Dan"
+        # 1. Text signatures win — the message tells us who sent it
+        m = _agent_signature_re.search(text)
+        if m:
+            return m.group(1)
 
-        # Direct channel mapping
+        # 2. Channel-based fallback
         if channel_id in _channel_agent_map:
             return _channel_agent_map[channel_id]
-
-        # Text-based fallback for unmapped channels (e.g. #dan-review)
-        for name in ("Mat", "Kat", "Sam", "Dan"):
-            if name in text:
-                return name
 
         return "CC-Bridge"
 
