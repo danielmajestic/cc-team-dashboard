@@ -1064,13 +1064,14 @@ class TestIssuesEndpoint:
             assert data[0]["column"] == "Done"
 
     def test_issues_includes_labels_list(self, app, client):
-        """Should include label names in response."""
+        """Should include label objects with name and color in response."""
         app.config["GITHUB_TOKEN"] = "test-token"
         app.config["GITHUB_REPOS"] = ["owner/repo"]
 
         issues_data = [
             self._sample_issue(1, "Labeled", labels=[
-                {"name": "bug"}, {"name": "in progress"}
+                {"name": "bug", "color": "d73a4a"},
+                {"name": "in progress", "color": "0075ca"}
             ]),
         ]
         mock_resp = self._make_github_response(issues_data)
@@ -1078,8 +1079,10 @@ class TestIssuesEndpoint:
         with patch("urllib.request.urlopen", return_value=mock_resp):
             resp = client.get("/api/issues")
             data = resp.get_json()
-            assert "bug" in data[0]["labels"]
-            assert "in progress" in data[0]["labels"]
+            label_names = [l["name"] for l in data[0]["labels"]]
+            assert "bug" in label_names
+            assert "in progress" in label_names
+            assert data[0]["labels"][0]["color"] == "d73a4a"
 
     def test_issues_includes_repo_name(self, app, client):
         """Should include repo full name in response."""
@@ -1153,3 +1156,134 @@ class TestIssuesEndpoint:
             assert "url" in issue
             assert "created_at" in issue
             assert "updated_at" in issue
+
+
+# --- GET /api/dispatch/status ---
+
+class TestDispatchStatus:
+    def test_status_returns_on(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("on\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.get("/api/dispatch/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "on"
+
+    def test_status_returns_off(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("off\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.get("/api/dispatch/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "off"
+
+    def test_status_returns_off_when_file_missing(self, app, client, tmp_path):
+        app.config["DISPATCH_FILE"] = str(tmp_path / "nonexistent")
+
+        resp = client.get("/api/dispatch/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "off"
+
+
+# --- POST /api/dispatch/toggle ---
+
+class TestDispatchToggle:
+    def test_toggle_flips_on_to_off(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("on\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.post("/api/dispatch/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "off"
+        assert dispatch_file.read_text().strip() == "off"
+
+    def test_toggle_flips_off_to_on(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("off\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.post("/api/dispatch/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "on"
+        assert dispatch_file.read_text().strip() == "on"
+
+    def test_toggle_creates_file_when_missing(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.post("/api/dispatch/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "on"
+        assert dispatch_file.read_text().strip() == "on"
+
+    def test_toggle_requires_api_key(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("off\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+        app.config["DASHBOARD_API_KEY"] = "secret-key"
+
+        resp = client.post("/api/dispatch/toggle")
+        assert resp.status_code == 403
+
+    def test_toggle_rejects_wrong_api_key(self, app, client, tmp_path):
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("off\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+        app.config["DASHBOARD_API_KEY"] = "secret-key"
+
+        resp = client.post("/api/dispatch/toggle",
+                           headers={"X-API-Key": "wrong-key"})
+        assert resp.status_code == 403
+
+
+# --- Heartbeat toggle syncs dispatch ---
+
+class TestHeartbeatSyncsDispatch:
+    def test_heartbeat_toggle_also_updates_dispatch(self, app, client, tmp_path):
+        """Toggling heartbeat should also update dispatch-enabled.txt."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("on\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("on\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is False
+
+        # Dispatch file should also be "off"
+        assert dispatch_file.read_text().strip() == "off"
+
+    def test_heartbeat_toggle_on_also_enables_dispatch(self, app, client, tmp_path):
+        """Toggling heartbeat on should also enable dispatch."""
+        hb_file = tmp_path / ".heartbeat-active"
+        hb_file.write_text("off\n")
+        app.config["HEARTBEAT_FILE"] = str(hb_file)
+
+        dispatch_file = tmp_path / "dispatch-enabled.txt"
+        dispatch_file.write_text("off\n")
+        app.config["DISPATCH_FILE"] = str(dispatch_file)
+
+        resp = client.post("/api/heartbeat/toggle",
+                           headers={"X-API-Key": "test-admin-key"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["active"] is True
+
+        assert dispatch_file.read_text().strip() == "on"

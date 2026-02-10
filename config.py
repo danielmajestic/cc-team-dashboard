@@ -40,6 +40,10 @@ class Config:
         os.path.expanduser("~/projects/cc-team-dashboard")
     )
     DASHBOARD_API_KEY = os.environ.get("DASHBOARD_API_KEY", "")
+    DISPATCH_FILE = os.environ.get(
+        "DISPATCH_FILE",
+        os.path.expanduser("~/agents/shared/dispatch/dispatch-enabled.txt")
+    )
 
 
 class TestConfig(Config):

@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}CC Team Dashboard{% endblock %}</title>
+    <title>{% block title %}CC Team Dashboard | ProfitAppsStudio{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        (function(){var t=localStorage.getItem('cc-dashboard-theme');if(t==='light')document.documentElement.classList.add('light-theme');})();
+    </script>
 </head>
 <body>
     <nav class="main-nav">
@@ -18,6 +22,7 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
+    <footer class="site-footer">ProfitAppsStudio &copy; 2026</footer>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

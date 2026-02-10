@@ -31,7 +31,6 @@ def create_app(testing=False, db_path_override=None):
     # Issues cache: {"data": [...], "timestamp": float}
     _issues_cache = {"data": None, "timestamp": 0}
 
-    def resolve_slack_user(user_id, token):
     def resolve_slack_user(user_id, token, fallback_name=""):
         """Resolve a Slack user ID to a display name via users.info API.
 
@@ -276,7 +275,57 @@ def create_app(testing=False, db_path_override=None):
         with open(hb_file, "w") as f:
             f.write(new_state + "\n")
 
+        # Sync dispatch state with heartbeat
+        dispatch_file = app.config.get(
+            "DISPATCH_FILE",
+            os.path.expanduser("~/agents/shared/dispatch/dispatch-enabled.txt")
+        )
+        try:
+            with open(dispatch_file, "w") as f:
+                f.write(new_state + "\n")
+        except OSError:
+            pass
+
         return jsonify({"active": new_state == "on"}), 200
+
+    # --- Dispatch toggle ---
+
+    @app.route("/api/dispatch/status", methods=["GET"])
+    def api_dispatch_status():
+        dispatch_file = app.config.get(
+            "DISPATCH_FILE",
+            os.path.expanduser("~/agents/shared/dispatch/dispatch-enabled.txt")
+        )
+        try:
+            with open(dispatch_file, "r") as f:
+                state = f.read().strip().lower()
+            return jsonify({"status": state}), 200
+        except FileNotFoundError:
+            return jsonify({"status": "off"}), 200
+
+    @app.route("/api/dispatch/toggle", methods=["POST"])
+    def api_dispatch_toggle():
+        api_key = app.config.get("DASHBOARD_API_KEY", "")
+        if api_key:
+            provided = request.headers.get("X-API-Key", "")
+            if provided != api_key:
+                return jsonify({"error": "forbidden"}), 403
+
+        dispatch_file = app.config.get(
+            "DISPATCH_FILE",
+            os.path.expanduser("~/agents/shared/dispatch/dispatch-enabled.txt")
+        )
+        try:
+            with open(dispatch_file, "r") as f:
+                current = f.read().strip().lower()
+        except FileNotFoundError:
+            current = "off"
+
+        new_state = "off" if current == "on" else "on"
+        with open(dispatch_file, "w") as f:
+            f.write(new_state + "\n")
+
+        return jsonify({"status": new_state}), 200
 
     # --- Activity feed ---
 
@@ -464,7 +513,10 @@ def create_app(testing=False, db_path_override=None):
                         "repo": repo,
                         "url": issue["html_url"],
                         "assignee": assignee["login"] if assignee else None,
-                        "labels": [l["name"] for l in labels],
+                        "labels": [
+                        {"name": l["name"], "color": l.get("color", "")}
+                        for l in labels
+                    ],
                         "created_at": issue["created_at"],
                         "updated_at": issue["updated_at"],
                     })
