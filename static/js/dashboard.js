@@ -132,6 +132,81 @@
         return div.innerHTML;
     }
 
+    // --- Label contrast helper ---
+
+    function contrastColor(hexColor) {
+        var r = parseInt(hexColor.substr(0, 2), 16);
+        var g = parseInt(hexColor.substr(2, 2), 16);
+        var b = parseInt(hexColor.substr(4, 2), 16);
+        var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        return brightness > 128 ? '#24292f' : '#ffffff';
+    }
+
+    // --- Slack emoji shortcode -> Unicode ---
+
+    var SLACK_EMOJI = {
+        ':smile:': '\uD83D\uDE04',
+        ':grinning:': '\uD83D\uDE00',
+        ':laughing:': '\uD83D\uDE06',
+        ':joy:': '\uD83D\uDE02',
+        ':wink:': '\uD83D\uDE09',
+        ':blush:': '\uD83D\uDE0A',
+        ':heart_eyes:': '\uD83D\uDE0D',
+        ':sunglasses:': '\uD83D\uDE0E',
+        ':thinking_face:': '\uD83E\uDD14',
+        ':thumbsup:': '\uD83D\uDC4D',
+        ':+1:': '\uD83D\uDC4D',
+        ':thumbsdown:': '\uD83D\uDC4E',
+        ':-1:': '\uD83D\uDC4E',
+        ':wave:': '\uD83D\uDC4B',
+        ':clap:': '\uD83D\uDC4F',
+        ':muscle:': '\uD83D\uDCAA',
+        ':pray:': '\uD83D\uDE4F',
+        ':point_right:': '\uD83D\uDC49',
+        ':point_left:': '\uD83D\uDC48',
+        ':eyes:': '\uD83D\uDC40',
+        ':heart:': '\u2764\uFE0F',
+        ':fire:': '\uD83D\uDD25',
+        ':rocket:': '\uD83D\uDE80',
+        ':star:': '\u2B50',
+        ':sparkles:': '\u2728',
+        ':tada:': '\uD83C\uDF89',
+        ':100:': '\uD83D\uDCAF',
+        ':zap:': '\u26A1',
+        ':boom:': '\uD83D\uDCA5',
+        ':white_check_mark:': '\u2705',
+        ':heavy_check_mark:': '\u2714\uFE0F',
+        ':x:': '\u274C',
+        ':warning:': '\u26A0\uFE0F',
+        ':rotating_light:': '\uD83D\uDEA8',
+        ':red_circle:': '\uD83D\uDD34',
+        ':large_blue_circle:': '\uD83D\uDD35',
+        ':green_circle:': '\uD83D\uDFE2',
+        ':bug:': '\uD83D\uDC1B',
+        ':wrench:': '\uD83D\uDD27',
+        ':hammer:': '\uD83D\uDD28',
+        ':gear:': '\u2699\uFE0F',
+        ':bulb:': '\uD83D\uDCA1',
+        ':memo:': '\uD83D\uDCDD',
+        ':package:': '\uD83D\uDCE6',
+        ':link:': '\uD83D\uDD17',
+        ':lock:': '\uD83D\uDD12',
+        ':key:': '\uD83D\uDD11',
+        ':bell:': '\uD83D\uDD14',
+        ':megaphone:': '\uD83D\uDCE3',
+        ':speech_balloon:': '\uD83D\uDCAC',
+        ':bar_chart:': '\uD83D\uDCCA',
+        ':chart_with_upwards_trend:': '\uD83D\uDCC8',
+        ':hourglass:': '\u23F3',
+        ':arrow_right:': '\u27A1\uFE0F'
+    };
+
+    function convertSlackEmoji(text) {
+        return text.replace(/:[a-z0-9_+-]+:/g, function (match) {
+            return SLACK_EMOJI[match] || match;
+        });
+    }
+
     // --- Terminal live view (agents page) ---
 
     var knownAgentNames = [];
@@ -372,6 +447,39 @@
         });
     }
 
+    // --- Theme toggle (light/dark mode) ---
+
+    function applyTheme(theme) {
+        if (theme === 'light') {
+            document.documentElement.classList.add('light-theme');
+        } else {
+            document.documentElement.classList.remove('light-theme');
+        }
+        var btn = document.getElementById('theme-toggle-btn');
+        if (btn) {
+            if (theme === 'dark') {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        }
+    }
+
+    function initThemeToggle() {
+        var saved = localStorage.getItem('cc-dashboard-theme') || 'dark';
+        applyTheme(saved);
+
+        var btn = document.getElementById('theme-toggle-btn');
+        if (!btn) return;
+
+        btn.addEventListener('click', function () {
+            var current = document.documentElement.classList.contains('light-theme') ? 'light' : 'dark';
+            var next = current === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('cc-dashboard-theme', next);
+            applyTheme(next);
+        });
+    }
+
     // --- Activity feed ---
 
     var ACTIVITY_ICONS = {
@@ -398,7 +506,7 @@
                 + '<span class="activity-icon ' + iconClass + '">' + icon + '</span>'
                 + '<div class="activity-body">'
                 + '<span class="activity-agent">' + escapeHtml(e.agent) + '</span>'
-                + '<span class="activity-message">' + escapeHtml(e.message) + '</span>'
+                + '<span class="activity-message">' + convertSlackEmoji(escapeHtml(e.message)) + '</span>'
                 + '</div>'
                 + '<span class="activity-time">' + timeAgo(e.timestamp) + '</span>'
                 + '</div>';
@@ -457,7 +565,15 @@
         if (issue.labels && issue.labels.length > 0) {
             labels = '<div class="issue-labels">';
             for (var k = 0; k < issue.labels.length; k++) {
-                labels += '<span class="issue-label">' + escapeHtml(issue.labels[k]) + '</span>';
+                var lbl = issue.labels[k];
+                var name = (typeof lbl === 'object') ? lbl.name : lbl;
+                var color = (typeof lbl === 'object' && lbl.color) ? lbl.color : '';
+                var style = '';
+                if (color) {
+                    style = ' style="background-color:#' + escapeHtml(color)
+                        + ';color:' + contrastColor(color) + ';"';
+                }
+                labels += '<span class="issue-label"' + style + '>' + escapeHtml(name) + '</span>';
             }
             labels += '</div>';
         }
@@ -527,7 +643,7 @@
         var html = '';
         for (var i = 0; i < issues.length; i++) {
             var issue = issues[i];
-            var labelsStr = (issue.labels || []).join(', ');
+            var labelsStr = (issue.labels || []).map(function (l) { return l.name || l; }).join(', ');
             html += '<tr>'
                 + '<td><a href="' + escapeHtml(issue.url) + '" target="_blank" rel="noopener">#' + issue.number + '</a></td>'
                 + '<td>' + escapeHtml(issue.title) + '</td>'
@@ -600,6 +716,7 @@
 
     // Initialize on DOM ready
     function init() {
+        initThemeToggle();
         fetchAgents();
         initFilters();
         initHeartbeatToggle();

@@ -1,8 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — CC Team Dashboard{% endblock %}
+{% block title %}Dashboard — CC Team Dashboard | ProfitAppsStudio{% endblock %}
 {% block content %}
 <div class="dashboard-header">
     <h1>Dashboard</h1>
+    <div class="theme-toggle" id="theme-toggle">
+        <span class="theme-label">Light</span>
+        <button class="toggle-btn" id="theme-toggle-btn" title="Toggle light/dark theme">
+            <span class="toggle-indicator"></span>
+        </button>
+        <span class="theme-label">Dark</span>
+    </div>
     <div class="heartbeat-toggle" id="heartbeat-toggle" {% if is_admin %}data-admin-mode="true"{% endif %}>
         <span class="heartbeat-label">Heartbeat</span>
         {% if is_admin %}
