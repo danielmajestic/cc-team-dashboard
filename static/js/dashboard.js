@@ -16,12 +16,33 @@
         'Dan': 'CEO',
         'Mat': 'PM',
         'Kat': 'Dev-1 (Backend)',
-        'Sam': 'Dev-2 (Frontend)'
+        'Sam': 'Dev-2 (Frontend)',
+        'Pixie': 'Creative Director',
+        'Alex': 'Paid Media',
+        'Riley': 'Content & Research'
+    };
+
+    // Role color mapping for color-coded badges
+    var ROLE_COLORS = {
+        'CEO': '#53d8fb',
+        'PM': '#f0c040',
+        'Dev-1 (Backend)': '#4ecca3',
+        'Dev-2 (Frontend)': '#4ecca3',
+        'Creative Director': '#a78bfa',
+        'Paid Media': '#f39c12',
+        'Content & Research': '#ff6b9d'
     };
 
     function getRole(name) {
         return ROLE_MAP[name] || 'Agent';
     }
+
+    function getRoleColor(role) {
+        return ROLE_COLORS[role] || 'var(--accent-highlight)';
+    }
+
+    // Track current filter state so it persists across refreshes
+    var currentFilter = 'all';
 
     function timeAgo(isoString) {
         if (!isoString) return 'Never';
@@ -79,13 +100,15 @@
         for (var i = 0; i < agents.length; i++) {
             var a = agents[i];
             var sc = statusClass(a.status);
+            var role = getRole(a.name);
+            var roleColor = getRoleColor(role);
             html += '<div class="agent-card" data-status="' + sc + '" data-agent-id="' + a.id + '">'
                 + '<div class="agent-card-header">'
                 + '<span class="agent-name">' + escapeHtml(a.name) + '</span>'
                 + '<span class="status-badge ' + sc + '">' + statusLabel(a.status) + '</span>'
                 + '</div>'
                 + '<div class="agent-card-body">'
-                + '<div class="agent-role">' + escapeHtml(getRole(a.name)) + '</div>'
+                + '<div class="agent-role" style="color:' + roleColor + '">' + escapeHtml(role) + '</div>'
                 + '<div class="agent-task">' + escapeHtml(a.current_task || 'No active task') + '</div>'
                 + '<div class="agent-lastseen">Last seen: ' + timeAgo(a.last_active) + '</div>'
                 + '</div>'
@@ -93,6 +116,9 @@
                 + '</div>';
         }
         container.innerHTML = html;
+
+        // Re-apply active filter after rendering
+        applyFilter(currentFilter);
 
         for (var j = 0; j < agents.length; j++) {
             fetchWorkingMd(agents[j].id, agents[j].name);
@@ -113,9 +139,11 @@
         for (var i = 0; i < agents.length; i++) {
             var a = agents[i];
             var sc = statusClass(a.status);
+            var role = getRole(a.name);
+            var roleColor = getRoleColor(role);
             html += '<tr data-status="' + sc + '">'
                 + '<td>' + escapeHtml(a.name) + '</td>'
-                + '<td>' + escapeHtml(getRole(a.name)) + '</td>'
+                + '<td><span style="color:' + roleColor + '">' + escapeHtml(role) + '</span></td>'
                 + '<td><span class="status-badge ' + sc + '">' + statusLabel(a.status) + '</span></td>'
                 + '<td>' + escapeHtml(a.current_task || '—') + '</td>'
                 + '<td>' + timeAgo(a.last_active) + '</td>'
@@ -123,6 +151,9 @@
                 + '</tr>';
         }
         tbody.innerHTML = html;
+
+        // Re-apply active filter after rendering
+        applyFilter(currentFilter);
     }
 
     function escapeHtml(str) {
@@ -215,10 +246,26 @@
         var grid = document.getElementById('terminal-grid');
         if (!grid) return;
 
-        knownAgentNames = [];
+        // Build new names list
+        var newNames = [];
         for (var i = 0; i < agents.length; i++) {
-            knownAgentNames.push(agents[i].name);
+            newNames.push(agents[i].name);
         }
+
+        // Only rebuild if agent list changed
+        var namesChanged = newNames.length !== knownAgentNames.length;
+        if (!namesChanged) {
+            for (var i = 0; i < newNames.length; i++) {
+                if (newNames[i] !== knownAgentNames[i]) {
+                    namesChanged = true;
+                    break;
+                }
+            }
+        }
+
+        knownAgentNames = newNames;
+
+        if (!namesChanged && grid.querySelector('.terminal-box')) return;
 
         if (knownAgentNames.length === 0) {
             grid.innerHTML = '<p class="empty-msg">No agents registered.</p>';
@@ -356,6 +403,7 @@
                 e.target.classList.add('active');
 
                 var filter = e.target.getAttribute('data-filter');
+                currentFilter = filter;
                 applyFilter(filter);
             });
         }

@@ -149,7 +149,7 @@ h2 {
 
 @media (min-width: 992px) {
     .agent-cards {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
