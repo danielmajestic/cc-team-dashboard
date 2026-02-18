@@ -34,21 +34,26 @@ def create_app(testing=False, db_path_override=None):
         """Strip Slack token patterns from text."""
         return _SLACK_TOKEN_RE.sub("[REDACTED]", text)
 
-    # Slack user ID -> display name cache
+    # Slack user ID -> (display_name, cached_at) with 1hr TTL
     _slack_user_cache = {}
+    _SLACK_CACHE_TTL = 3600  # 1 hour
 
     # Issues cache: {"data": [...], "timestamp": float}
     _issues_cache = {"data": None, "timestamp": 0}
 
+    # Regex matching <@UXXXXXXX> or <@UXXXXXXX|name> patterns in text
+    _SLACK_MENTION_RE = re.compile(r'<@(U[A-Z0-9]+)(?:\|[^>]*)?>')
+
     def resolve_slack_user(user_id, token, fallback_name=""):
         """Resolve a Slack user ID to a display name via users.info API.
 
-        Results are cached in _slack_user_cache. Falls back to
+        Results are cached in _slack_user_cache with 1hr TTL. Falls back to
         fallback_name (e.g. bot_profile.name) or the raw user_id.
         """
-
-        if user_id in _slack_user_cache:
-            return _slack_user_cache[user_id]
+        now = time.time()
+        cached = _slack_user_cache.get(user_id)
+        if cached and (now - cached[1]) < _SLACK_CACHE_TTL:
+            return cached[0]
 
         try:
             url = f"https://slack.com/api/users.info?user={user_id}"
@@ -63,14 +68,26 @@ def create_app(testing=False, db_path_override=None):
                 name = (profile.get("display_name")
                         or data["user"].get("real_name")
                         or user_id)
-                _slack_user_cache[user_id] = name
+                _slack_user_cache[user_id] = (name, now)
                 return name
         except (urllib.error.URLError, OSError, ValueError, KeyError):
             pass
 
         resolved = fallback_name or user_id
-        _slack_user_cache[user_id] = resolved
+        _slack_user_cache[user_id] = (resolved, now)
         return resolved
+
+    def _resolve_mentions_in_text(text, token):
+        """Replace all <@UXXXXXXX> patterns in text with display names."""
+        if not token:
+            return text
+
+        def _replace_mention(match):
+            user_id = match.group(1)
+            name = resolve_slack_user(user_id, token)
+            return f"@{name}"
+
+        return _SLACK_MENTION_RE.sub(_replace_mention, text)
 
     # Channel ID -> team member name for CC-Bridge relay messages
     _channel_agent_map = {
@@ -226,9 +243,10 @@ def create_app(testing=False, db_path_override=None):
         if not re.fullmatch(r'[A-Za-z0-9_-]+', name):
             return jsonify({"error": "invalid agent name"}), 400
 
+        session = name.lower()
         try:
             result = subprocess.run(
-                ["tmux", "capture-pane", "-p", "-t", name, "-S", "-30"],
+                ["tmux", "capture-pane", "-p", "-t", session, "-S", "-30"],
                 capture_output=True, text=True, timeout=5
             )
         except FileNotFoundError:
@@ -426,6 +444,9 @@ def create_app(testing=False, db_path_override=None):
                                 raw_user, token, fallback_name=bot_name
                             ) if raw_user != "unknown" else "unknown"
                             msg_text = msg.get("text", "")
+                            msg_text = _resolve_mentions_in_text(
+                                msg_text, token
+                            )
                             agent_name = _infer_agent_name(
                                 display_name, channel_id, msg_text
                             )
