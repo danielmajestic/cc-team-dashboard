@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 import os
 import re
@@ -6,9 +7,13 @@ import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
+import bleach
 import markdown
 from flask import Flask, render_template, request, jsonify
 from config import Config, TestConfig
+
+# Regex to match Slack token patterns (xoxb-*, xoxp-*, xoxs-*, xoxa-*, xoxr-*)
+_SLACK_TOKEN_RE = re.compile(r'xox[bpsaro]-[A-Za-z0-9\-]+')
 
 
 def create_app(testing=False, db_path_override=None):
@@ -24,6 +29,10 @@ def create_app(testing=False, db_path_override=None):
 
     # Ensure instance folder exists
     os.makedirs(os.path.join(app.root_path, "instance"), exist_ok=True)
+
+    def _sanitize_tokens(text):
+        """Strip Slack token patterns from text."""
+        return _SLACK_TOKEN_RE.sub("[REDACTED]", text)
 
     # Slack user ID -> display name cache
     _slack_user_cache = {}
@@ -196,7 +205,15 @@ def create_app(testing=False, db_path_override=None):
         with open(working_path, "r") as f:
             content = f.read()
 
-        content_html = markdown.markdown(content)
+        raw_html = markdown.markdown(content)
+        content_html = bleach.clean(
+            raw_html,
+            tags=["h1", "h2", "h3", "h4", "h5", "h6",
+                  "p", "br", "hr", "ul", "ol", "li",
+                  "strong", "em", "code", "pre", "blockquote",
+                  "a", "table", "thead", "tbody", "tr", "th", "td"],
+            attributes={"a": ["href", "title"]},
+        )
 
         return jsonify({
             "agent_name": agent["name"],
@@ -223,7 +240,7 @@ def create_app(testing=False, db_path_override=None):
             return jsonify({"error": "tmux session not found",
                             "detail": result.stderr.strip()}), 404
 
-        return jsonify({"name": name, "output": result.stdout}), 200
+        return jsonify({"name": name, "output": _sanitize_tokens(result.stdout)}), 200
 
     @app.route("/api/agents", methods=["GET"])
     def api_list_agents():
@@ -356,7 +373,9 @@ def create_app(testing=False, db_path_override=None):
                             "type": "commit",
                             "timestamp": parts[3],
                             "agent": parts[1],
-                            "message": f"{parts[0]} {parts[2]}"
+                            "message": _sanitize_tokens(
+                                f"{parts[0]} {parts[2]}"
+                            ),
                         })
         except (subprocess.TimeoutExpired, FileNotFoundError):
             pass
@@ -414,7 +433,7 @@ def create_app(testing=False, db_path_override=None):
                                 "type": "slack",
                                 "timestamp": dt,
                                 "agent": agent_name,
-                                "message": msg_text[:200],
+                                "message": _sanitize_tokens(msg_text[:200]),
                             })
                 except (urllib.error.URLError, OSError, ValueError):
                     pass
@@ -545,4 +564,4 @@ def create_app(testing=False, db_path_override=None):
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', '0') == '1')
+    app.run(host='0.0.0.0', port=5000, debug=os.environ.get('FLASK_DEBUG', 'false').lower() == 'true')
