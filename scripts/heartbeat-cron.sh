@@ -20,6 +20,18 @@ register_agents() {
         -H "Content-Type: application/json" \
         -d '{"name": "Sam", "role": "frontend"}' > /dev/null
 
+    curl -sf -X POST "$API_BASE/api/agents/register" \
+        -H "Content-Type: application/json" \
+        -d '{"name": "Pixie", "role": "creative"}' > /dev/null
+
+    curl -sf -X POST "$API_BASE/api/agents/register" \
+        -H "Content-Type: application/json" \
+        -d '{"name": "Alex", "role": "paid-media"}' > /dev/null
+
+    curl -sf -X POST "$API_BASE/api/agents/register" \
+        -H "Content-Type: application/json" \
+        -d '{"name": "Riley", "role": "content"}' > /dev/null
+
     echo "Agents registered."
 }
 
@@ -32,7 +44,7 @@ get_agent_id() {
 
 # Send heartbeat for all agents
 send_heartbeats() {
-    for name in Mat Kat Sam; do
+    for name in Mat Kat Sam Pixie Alex Riley; do
         local agent_id
         agent_id=$(get_agent_id "$name")
         curl -sf -X POST "$API_BASE/api/agents/${agent_id}/heartbeat" \
