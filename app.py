@@ -110,6 +110,13 @@ def create_app(testing=False, db_path_override=None):
     init_db(db_conn)
     db_conn.close()
 
+    @app.context_processor
+    def inject_site_name():
+        host = request.host.split(":")[0]  # strip port if present
+        if host == "dashboard.ravingfans.ai":
+            return {"site_name": "RavingFans.ai Team Dashboard"}
+        return {"site_name": "CC Team Dashboard"}
+
     # --- Template routes ---
 
     @app.route("/")

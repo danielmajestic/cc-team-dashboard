@@ -1,0 +1,10 @@
+tunnel: cc-dashboard
+credentials-file: /home/dan/.cloudflared/6b5a7b1c-19ef-4505-aab4-0d354326d76c.json
+ingress:
+  - hostname: dashboard.danknows.org
+    service: http://127.0.0.1:5000
+  - hostname: dashboard.ravingfans.ai
+    service: http://127.0.0.1:5000
+  - hostname: hooks.danknows.org
+    service: http://127.0.0.1:5678
+  - service: http_status:404
